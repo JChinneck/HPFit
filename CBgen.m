@@ -1,4 +1,7 @@
 % March 8, 2022
+% John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
+% J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
+
 % This function fits a hyperplane to a set of data points in a way that
 % heuristically maximizes the number of points that are "close" to it. It
 % uses a 3 step process: (1) fit a first hyperplane to the complete data
