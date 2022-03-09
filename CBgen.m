@@ -40,6 +40,7 @@
 %       hyperplane equation.
 %    .totSqDistAll1, totSqDistAll2, totSqDistAll3, totSqDistAllOut: total
 %       squared distance to all points
+%    .solTime: solution time in seconds.
 %    If maxDist ~= 0: 
 %      .inc.closeAll1, inc.closeAll2, inc.closeAll3, inc.closeAllOut: 
 %        number of points "close" to the hyperplane
