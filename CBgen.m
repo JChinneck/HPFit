@@ -1,4 +1,4 @@
-% March 8, 2022
+% March 9, 2022
 % John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
 
@@ -23,38 +23,28 @@
 %                   hyperplane to used as maxDist. Note it is in %. 
 %                   maxDist = -16 is recommended.
 %              = 0: means that maxDist is not used to help identify the
-%                   best hyperplane to output.
-%              > 0: used as an actual Euclidean distance to define maxDist
-%                   which defines close points.
-% OUTPUTS: these are all fields of inc
+%                   best hyperplane.
+%              > 0: used as an actual Euclidean distance to define maxDist.
+% OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
 %     .maxDist: the final value of maxDist, points closer than maxDist to
 %       a hyperplane are counted as being "close" to it 
-%     .m1, .m2, .m3: the number of data points when finding the three
-%       hyperplanes
+%     .m[x]: the number of data points when finding the hyperplanes
 %    [NOTE: hyerplane equations have this form:
 %       weight_1*x_1 + weight_2*x_2 + .... = RHS]
-%    .weights1, .weights2, .weights3, .weightsOut: the weights in the three
-%       hyperplane equations, and the weights in the output hyperplane
-%    .RHS1, .RHS2, .RHS3, .RHSOut: the right hand side values in the three
-%       hyperplane equations, and the right hand side in the output
-%       hyperplane equation.
-%    .totSqDistAll1, totSqDistAll2, totSqDistAll3, totSqDistAllOut: total
-%       squared distance to all points
+%    .weights[x]: the weights in the hyperplane equations
+%    .RHS[x]: the right hand side values in the hyperplane equations
+%    .totSqDistAll[x]: total squared distance to all points
 %    .solTime: solution time in seconds.
 %    If maxDist ~= 0: 
-%      .inc.closeAll1, inc.closeAll2, inc.closeAll3, inc.closeAllOut: 
-%        number of points "close" to the hyperplane
+%      .inc.closeAll[x]: number of points "close" to the hyperplane
 %      If mgood > 0:
-%        .closeTru1, .closeTru2, .closeTru3, .closeTruOut:
-%          the number of points "close" to the hyperplane
+%        .closeTru[x]: number of mgood points "close" to the hyperplane
 %    if mgood > 0:
-%      .totSqDistTru1, .totSqDistTru2, .totSqDistTru3, .totSqDistTruOut:
-%        the total squared distances to the mgood points
-%      .SMSSE1, .SMSSE2, .SMSSE3, .SMSSEOut: the "sum of mgood smallest
-%        squared errors" for the hyperplanes. This is the same as "trimmed 
-%        squared error" for mgood points. Note that isn't necessarily the
-%        mgood non-outlier points identified as input, just mgood points in
-%        total.
+%      .totSqDistTru[x]: total squared distances to the mgood points
+%      .SMSSE[x]: the "sum of mgood smallest squared errors" for the 
+%        hyperplanes. This is the same as "trimmed squared error" for 
+%        mgood points. Note that it isn't necessarily the mgood non-outlier 
+%        points identified on input, just mgood points in total.
 %      .bnd2: this is a tight upper bound on the best possible SMSSE value,
 %        calculated by fitting the PCA to only the mgood points and then
 %        calculating the SMSSE for those points. 
