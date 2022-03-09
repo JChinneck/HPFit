@@ -56,7 +56,7 @@
 %      .MSETru[x]: mean squared residual for the mgood points
 %      .MAETru[x]: mean absolute residual for the mgood points
 
-function [inc] = CBregFinal(y,Aorig,inParam)
+function [inc] = CBreg(y,Aorig,inParam)
 
 fprintf("Input parameters:\n")
 fprintf("  mgood %d\n",inParam.mgood)
