@@ -56,7 +56,7 @@
 %      .MSETru[x]: mean squared residual for the mgood points
 %      .MAETru[x]: mean absolute residual for the mgood points
 
-function [inc] = CBregFinal(y,Aorig,inParam)
+function [inc] = CBreg(y,Aorig,inParam)
 
 fprintf("Input parameters:\n")
 fprintf("  mgood %d\n",inParam.mgood)
@@ -116,6 +116,7 @@ if mgood > 0
     fprintf("  SMSRE %f. \n",inc.SMSRE1)
 end
 inc.totSqResidAll1 = norm(absresid(:,1).*absresid(:,1),1);
+inc.totSqResidAllOut = inc.totSqResidAll1;
 inc.weights1 = w;
 inc.w01 = w0;
 if maxResid > 0
@@ -396,4 +397,3 @@ end
  
 return
 end
-
