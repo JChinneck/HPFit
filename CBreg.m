@@ -1,4 +1,4 @@
-% March 9, 2022
+% March 18, 2022
 % John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
  
@@ -56,7 +56,7 @@
 %      .MSETru[x]: mean squared residual for the mgood points
 %      .MAETru[x]: mean absolute residual for the mgood points
 
-function [inc] = CBreg(y,Aorig,inParam)
+function [inc] = CBregFinal(y,Aorig,inParam)
 
 fprintf("Input parameters:\n")
 fprintf("  mgood %d\n",inParam.mgood)
@@ -120,6 +120,7 @@ inc.weights1 = w;
 inc.w01 = w0;
 if maxResid > 0
     inc.numCloseAll1 = sum(absresid(:,1) <= maxResid);
+    inc.numCloseAllOut = inc.numCloseAll1;
     fprintf("  %d close points\n",inc.numCloseAll1)
 end
 
