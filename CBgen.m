@@ -1,4 +1,4 @@
-% March 9, 2022
+% March 18, 2022
 % John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
 
@@ -49,7 +49,7 @@
 %        calculated by fitting the PCA to only the mgood points and then
 %        calculating the SMSSE for those points. 
 
-function [inc] = CBgen(Aorig,inParam)
+function [inc] = CBgenFinal(Aorig,inParam)
 
 mgood = inParam.mgood;
 tic;
@@ -85,6 +85,7 @@ inc.maxDist = maxDist;
 inc.totSqDistAll1 = norm(edist(:,1).*edist(:,1),1);
 if maxDist ~= 0
     inc.closeAll1 = sum(edist <= maxDist);
+    inc.closeAllOut = inc.closeAll1;
 end
 inc.weights1 = weights;
 inc.RHS1 = RHS;
@@ -156,6 +157,7 @@ end
 % Update output solution if appropriate
 if maxDist ~= 0
     if inc.closeAll2 > inc.closeAll1
+        inc.closeAllOut = inc.closeAll2;
         inc.weightsOut = inc.weights2;
         inc.RHSOut = inc.RHS2;
         inc.totSqDistAllOut = inc.totSqDistAll2;
@@ -220,6 +222,7 @@ end
 % Update output solution if appropriate
 if maxDist ~= 0
     if inc.closeAll3 >= max(inc.closeAll1,inc.closeAll2)
+        inc.closeAllOut = inc.closeAll3;
         inc.weightsOut = inc.weights3;
         inc.RHSOut = inc.RHS3;
         inc.totSqDistAllOut = inc.totSqDistAll3;
