@@ -51,6 +51,10 @@
 
 function [inc] = CBgenFinal(Aorig,inParam)
 
+fprintf("Input parameters:\n");
+fprintf("  mgood %d\n",inParam.mgood)
+fprintf("  maxDist %f\n",inParam.maxDist)
+
 mgood = inParam.mgood;
 tic;
 
@@ -59,12 +63,13 @@ m = size(Aorig,1);
 norig = size(Aorig,2);
 % Print some stats to console
 if mgood > 0
-    fprintf("mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
+    fprintf("  Stats: mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
 else
-    fprintf("mtot %d n %d mtot/n %f\n",m,norig,m/norig)
+    fprintf("  Stats: mtot %d n %d mtot/n %f\n",m,norig,m/norig)
 end
 
 % initial PCA solution for the original dataset ---------------------------
+fprintf("Initial PCA on all %d points.\n",m)
 inc.m1 = m;
 [weights,RHS] = getPCAHP(Aorig);
 % Calculate the point distances from the hyperplane
@@ -77,7 +82,7 @@ edist = abs(dist/gradLen);
 maxDist = inParam.maxDist;
 if inParam.maxDist < 0
     maxDist = prctile(edist,-maxDist);
-    fprintf("maxDist automatically selected as %f\n",maxDist)
+    fprintf("  maxDist automatically selected as %f\n",maxDist)
 end
 inc.maxDist = maxDist; 
 
@@ -86,6 +91,7 @@ inc.totSqDistAll1 = norm(edist(:,1).*edist(:,1),1);
 if maxDist ~= 0
     inc.closeAll1 = sum(edist <= maxDist);
     inc.closeAllOut = inc.closeAll1;
+    fprintf("  %d close points\n",inc.closeAll1)
 end
 inc.weights1 = weights;
 inc.RHS1 = RHS;
@@ -94,12 +100,11 @@ if mgood > 0
     if maxDist ~= 0
         inc.closeTru1 = sum(edist(1:mgood,1) < maxDist);
     end
-    fprintf("Initial PCA: tot sq dist tru %f\n",inc.totSqDistTru1)  
     % Calculate SMSSE, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
     inc.SMSSE1 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
     inc.SMSSEout = inc.SMSSE1;
-    fprintf("SMSSE1 %f\n",inc.SMSSE1)
+    fprintf("  SMSSE %f\n",inc.SMSSE1)
     %Calculate bnd2
     [weights,RHS] = getPCAHP(Aorig(1:mgood,:));
     dist = Aorig*weights - RHS;
@@ -109,6 +114,7 @@ if mgood > 0
     inc.bnd2 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
     inc.SMSSEout = inc.SMSSE1;
 end
+outStep = 1;
 
 % Analyze and remove outliers ---------------------------------------------
 % outFinder removes no more than mtot-n points, so that PCA can run
@@ -123,6 +129,7 @@ for i=1:m
 end
 B = B(1:icount,:);
 inc.m2 = icount;
+fprintf("Outliers removed: %d points remain.\n",icount)
 
 % get the PCA solution
 [weights,RHS] = getPCAHP(B);
@@ -135,28 +142,29 @@ edist = abs(dist/gradLen);
 inc.totSqDistAll2 = norm(edist(:,1).*edist(:,1),1);
 if maxDist ~= 0
     inc.closeAll2 = sum(edist <= maxDist);
+    fprintf("  %d close points\n",inc.closeAll2)
 end
 inc.weights2 = weights;
 inc.RHS2 = RHS;
 
 if mgood > 0
-    fprintf("Fractions removed: tru %f out %f. %d total pts left.\n",OM.outTruFrac,OM.outOutFrac,icount)
+    fprintf("  Fractions removed: tru %f out %f.\n",OM.outTruFrac,OM.outOutFrac)
     inc.outTruFrac = OM.outTruFrac;
     inc.outOutFrac = OM.outOutFrac;
     inc.totSqDistTru2 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
     if maxDist ~= 0
         inc.closeTru2 = sum(edist(1:mgood,1) < maxDist);
     end
-    fprintf("After removal: tot sq dist tru %f\n",inc.totSqDistTru2)
     % Calculate SMSSE, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
     inc.SMSSE2 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
-    fprintf("SMSSE2 %f\n",inc.SMSSE2)
+    fprintf("  SMSSE %f\n",inc.SMSSE2)
 end
 
 % Update output solution if appropriate
 if maxDist ~= 0
     if inc.closeAll2 > inc.closeAll1
+        outStep = 2;
         inc.closeAllOut = inc.closeAll2;
         inc.weightsOut = inc.weights2;
         inc.RHSOut = inc.RHS2;
@@ -190,7 +198,7 @@ for i=1:m
 end
 B = B(1:mB,:);
 inc.m3 = mB;
-fprintf("%d points after reinstatement.\n",mB)
+fprintf("Reinstatement phase: %d points\n",mB)
 
 % get the PCA solution
 [weights,RHS] = getPCAHP(B);
@@ -203,6 +211,7 @@ edist = abs(dist/gradLen);
 inc.totSqDistAll3 = norm(edist(:,1).*edist(:,1),1);
 if maxDist ~= 0
     inc.closeAll3 = sum(edist <= maxDist);
+    fprintf("  %d close points\n",inc.closeAll3)
 end
 inc.weights3 = weights;
 inc.RHS3 = RHS;
@@ -212,16 +221,16 @@ if mgood > 0
     if maxDist ~= 0
         inc.closeTru3 = sum(edist(1:mgood,1) < maxDist);
     end
-    fprintf("After reinstatement: tot sq dist tru %f\n",inc.totSqDistTru3)
     % Calculate SMSSE, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
     inc.SMSSE3 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
-    fprintf("SMSSE3 %f\n",inc.SMSSE3)
+    fprintf("  SMSSE %f\n",inc.SMSSE3)
 end
 
 % Update output solution if appropriate
 if maxDist ~= 0
     if inc.closeAll3 >= max(inc.closeAll1,inc.closeAll2)
+        outStep = 3;
         inc.closeAllOut = inc.closeAll3;
         inc.weightsOut = inc.weights3;
         inc.RHSOut = inc.RHS3;
@@ -235,6 +244,7 @@ if maxDist ~= 0
 end
 
 if maxDist == 0
+    outStep = 3;
     inc.weightsOut = inc.weights3;
     inc.RHSout = inc.RHS3;
     inc.totSqDistAllOut = inc.totSqDistAll3;
@@ -244,11 +254,15 @@ if maxDist == 0
     end
 end
 
-if mgood > 0
-    fprintf("Final SMSSE %f\n",inc.SMSSEout)
-end
-
 inc.solTime = toc;
+
+fprintf("Final solution from Step %d.\n",outStep)
+if maxDist ~= 0
+    fprintf("  %d close points\n",inc.closeAllOut)
+end
+if mgood > 0
+    fprintf("  SMSSE %f\n",inc.SMSSEout)
+end
 
 return
 end
