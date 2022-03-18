@@ -254,7 +254,6 @@ end
 inc.weights3 = w;
 inc.w03 = w0;
 
-fprintf("Output solution:\n")
 if maxResid == 0
    % Just return the third regression
    inc.weightsOut = inc.weights3;
@@ -293,6 +292,10 @@ if maxResid ~= 0
 end
 
 inc.solTime = toc;
+
+fprintf("Output solution:\n")
+fprintf("  SMSRE %f\n",inc.SMSREOut);
+fprintf("  %d close points\n",inc.numCloseAllOut);
 
 return
 end
