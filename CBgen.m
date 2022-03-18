@@ -88,6 +88,7 @@ inc.maxDist = maxDist;
 
 % Gather statistics about the initial PCA solution
 inc.totSqDistAll1 = norm(edist(:,1).*edist(:,1),1);
+inc.totSqDistAllOut = inc.totSqDistAll1;
 if maxDist ~= 0
     inc.closeAll1 = sum(edist <= maxDist);
     inc.closeAllOut = inc.closeAll1;
