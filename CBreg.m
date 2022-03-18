@@ -123,6 +123,7 @@ if maxResid > 0
     inc.numCloseAllOut = inc.numCloseAll1;
     fprintf("  %d close points\n",inc.numCloseAll1)
 end
+outStep = 1;
 
 % Analyze and remove outliers ---------------------------------------------
 
@@ -181,6 +182,7 @@ inc.w02 = w0;
 %Update output solution if appropriate
 if maxResid ~= 0
     if inc.numCloseAll2 >= inc.numCloseAll1
+        outStep = 2;
         inc.weightsOut = inc.weights2;
         inc.w0Out = inc.w02;
         inc.residOut = inc.resid2;
@@ -256,6 +258,7 @@ inc.w03 = w0;
 
 if maxResid == 0
    % Just return the third regression
+   outStep = 3;
    inc.weightsOut = inc.weights3;
    inc.w0Out = inc.w03;
    inc.residOut = inc.resid3;
@@ -273,6 +276,7 @@ end
 %Update output solution if appropriate
 if maxResid ~= 0
     if inc.numCloseAll3 >= inc.numCloseAllOut
+        outStep = 3;
         inc.weightsOut = inc.weights3;
         inc.w0Out = inc.w03;
         inc.residOut = inc.resid3;
@@ -293,9 +297,13 @@ end
 
 inc.solTime = toc;
 
-fprintf("Output solution:\n")
-fprintf("  SMSRE %f\n",inc.SMSREOut);
-fprintf("  %d close points\n",inc.numCloseAllOut);
+fprintf("Output solution from Step %d\n",outStep)
+if mgood > 0
+    fprintf("  SMSRE %f\n",inc.SMSREOut);
+end
+if maxResid ~= 0
+    fprintf("  %d close points\n",inc.numCloseAllOut);
+end
 
 return
 end
@@ -388,3 +396,4 @@ end
  
 return
 end
+
