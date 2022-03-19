@@ -1,4 +1,4 @@
-% March 18, 2022
+% March 19, 2022
 % John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
  
@@ -113,6 +113,7 @@ if mgood > 0
     % Calculate SMSRE
     sortedabsResid = sort(absresid);
     inc.SMSRE1 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
+    inc.SMSREOut = inc.SMSRE1;
     fprintf("  SMSRE %f. \n",inc.SMSRE1)
 end
 inc.totSqResidAll1 = norm(absresid(:,1).*absresid(:,1),1);
