@@ -293,7 +293,9 @@ if maxResid ~= 0
             inc.SMSREOut = inc.SMSRE3;
             fprintf("  SMSRE %f.\n",inc.SMSREOut)
         end
-        fprintf("  %d close points\n",inc.numCloseAllOut)
+        if maxResid ~= 0
+            fprintf("  %d close points\n",inc.numCloseAllOut)
+        end
     end
 end
 
