@@ -113,7 +113,7 @@ if mgood > 0
     gradLen = norm(weights);
     edist = abs(dist/gradLen);
     inc.bnd2 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
-    inc.SMSSEout = inc.SMSSE1;
+    fprintf("  bnd2: %f\n",inc.bnd2)
 end
 outStep = 1;
 
