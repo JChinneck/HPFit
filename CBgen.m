@@ -1,6 +1,8 @@
-% March 18, 2022
-% John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
-% J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
+% April 8, 2022
+% John W. Chinneck, Systems and Computer Engineering, 
+%   Carleton University, Ottawa, Canada
+% J. Paul Brooks, Dept. of Information Systems, 
+%   Virginia Commonwealth University, Richmond, Virginia, USA
 
 % This function fits a hyperplane to a set of data points in a way that
 % heuristically maximizes the number of points that are "close" to it. It
@@ -12,27 +14,30 @@
 % INPUTS:
 %   Aorig: the original data matrix (points x variables)
 %   inParam: input parameters:
-%     mgood: if > 0 this is the known number of nonoutlier points, which
+%     .mgood: if > 0 this is the known number of inlier points, which
 %            must be the first mgood points in the set. Knowing this allows
 %            the calculation of useful statistics for testing purposes. Of
-%            course mgood is not known in general.
-%     maxDist: points closer than this distance to a hyperplane are
+%            course mgood is not known in general. Must be specified.
+%     .maxDist: points closer than this distance to a hyperplane are
 %              "close". Distance is Euclidean.
 %              There are 3 cases:
 %              < 0: -maxDist is the percentile of distances from the first
-%                   hyperplane to used as maxDist. Note it is in %. 
-%                   maxDist = -16 is recommended.
-%              = 0: means that maxDist is not used to help identify the
-%                   best hyperplane.
-%              > 0: used as an actual Euclidean distance to define maxDist.
+%                   hyperplane. Note it is in %. 
+%                   NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
+%                   If maxDist is not specified, then -16 is used.
+%              = 0: means that closeAll is not used to help identify the
+%                   best hyperplane. Result is just the 3rd hyperplane.
+%              > 0: an actual Euclidean distance to define maxDist.
 % OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
 %     .maxDist: the final value of maxDist, points closer than maxDist to
 %       a hyperplane are counted as being "close" to it 
 %     .m[x]: the number of data points when finding the hyperplanes
-%    [NOTE: hyerplane equations have this form:
+%       [NOTE: hyerplane equations have this form:
 %       weight_1*x_1 + weight_2*x_2 + .... = RHS]
 %    .weights[x]: the weights in the hyperplane equations
 %    .RHS[x]: the right hand side values in the hyperplane equations
+%    .q: number of inliers estimated by the outFinder routine
+%    .qout: number of inliers estimated by final hyperplane
 %    .totSqDistAll[x]: total squared distance to all points
 %    .solTime: solution time in seconds.
 %    If maxDist ~= 0: 
@@ -49,13 +54,23 @@
 %        calculated by fitting the PCA to only the mgood points and then
 %        calculating the SMSSE for those points. 
 
-function [inc] = CBgen(Aorig,inParam)
+function [inc] = CBgenFinalV2(Aorig,inParam)
 
 fprintf("Input parameters:\n");
 fprintf("  mgood %d\n",inParam.mgood)
 fprintf("  maxDist %f\n",inParam.maxDist)
 
-mgood = inParam.mgood;
+if isfield(inParam,'mgood') == 1
+    mgood = inParam.mgood;
+else
+    mgood = 0;
+end
+if isfield(inParam,'maxDist') == 1
+    maxDist = inParam.maxDist;
+else
+    % default to the recommended value
+    maxDist = -16;
+end
 tic;
 
 % Get data table dimensions
@@ -79,8 +94,7 @@ gradLen = norm(weights);
 edist = abs(dist/gradLen);
 
 % Find maxDist automatically if not prespecified
-maxDist = inParam.maxDist;
-if inParam.maxDist < 0
+if maxDist < 0
     maxDist = prctile(edist,-maxDist);
     fprintf("  maxDist automatically selected as %f\n",maxDist)
 end
@@ -96,6 +110,9 @@ if maxDist ~= 0
 end
 inc.weights1 = weights;
 inc.RHS1 = RHS;
+inc.weightsOut = inc.weights1;
+inc.RHSOut = inc.RHS1;
+
 if mgood > 0
     inc.totSqDistTru1 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
     if maxDist ~= 0
@@ -120,6 +137,7 @@ outStep = 1;
 % Analyze and remove outliers ---------------------------------------------
 % outFinder removes no more than mtot-n points, so that PCA can run
 [OM] = outFinder(Aorig,mgood);
+inc.q = OM.q;
 B = zeros(m,norig);
 icount = 0;
 for i=1:m
@@ -247,7 +265,7 @@ end
 if maxDist == 0
     outStep = 3;
     inc.weightsOut = inc.weights3;
-    inc.RHSout = inc.RHS3;
+    inc.RHSOut = inc.RHS3;
     inc.totSqDistAllOut = inc.totSqDistAll3;
     if mgood > 0
         inc.SMSSEout = inc.SMSSE3;
@@ -264,6 +282,15 @@ end
 if mgood > 0
     fprintf("  SMSSE %f\n",inc.SMSSEout)
 end
+
+% Calculate the estimated number of inliers at output (qout)
+% Calculate the point distances from the hyperplane
+dist = Aorig*inc.weightsOut - inc.RHSOut;
+% Calculate the Euclidean point distances from the hyperplane
+gradLen = norm(inc.weightsOut);
+edist = abs(dist/gradLen);
+outliers = isoutlier(edist);
+inc.qout = m - sum(outliers);
 
 return
 end
@@ -286,6 +313,7 @@ end
 %         axis, including the original variables and the PCA axes
 %   .TF: mx1 logical vector listing points identified as outliers
 %   .count: total number of points identified as outliers
+%   .q: the estimated number of inliers
 %   If mgood > 0 and mgood < m:
 %     .outTru: number of nonoutlier points identified as outliers
 %     .outTruFrac: fraction of nonoutlier points identified as outliers
@@ -335,10 +363,12 @@ else
     istart = ceil(m/2);
     cutoff = sortedMax(istart,1);
 end
+outMeasure.q = istart - 1;
  
 for i = istart:m
     if changes(i,1)
         cutoff = sortedMax(i,1);
+        outMeasure.q = i-1;
         break
     end
 end
@@ -355,7 +385,7 @@ end
 
 return
 end
-%----------------------------------------------------------------------
+%--------------------------------------------------------------------------
 % March 21, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
