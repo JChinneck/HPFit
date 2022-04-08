@@ -54,7 +54,7 @@
 %        calculated by fitting the PCA to only the mgood points and then
 %        calculating the SMSSE for those points. 
 
-function [inc] = CBgenFinalV2(Aorig,inParam)
+function [inc] = CBgen(Aorig,inParam)
 
 fprintf("Input parameters:\n");
 fprintf("  mgood %d\n",inParam.mgood)
