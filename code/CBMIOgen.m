@@ -1,4 +1,4 @@
-% May 11, 2022
+% May 25, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -61,8 +61,8 @@
 %      .bnd2: sum of squared Euclidean distances to a hyperplane fit to the
 %        mtru input points
 %
-% DEPENDENCIES: this routine calls CBgen and the external solver Gurobi.
-%   Gurobi is free for academics.
+% DEPENDENCIES: this routine calls CBgen, and the external solver Gurobi.
+%    Gurobi has a free academic license.
 
 function [result,output] = CBMIOgen(Ain,mioparams,gbparams)
 
@@ -115,6 +115,20 @@ fprintf("  q set at %d\n",q)
 
 [output] = update(1,Ain,inc.weightsOut,inc.RHSOut,q,maxDist,mtru,output);
 output.CBgenTime = toc(tStart);
+
+if inc.status == -1
+    fprintf("  CBgen failure: aborting MIO solution.\n")
+    result.status = "ABORTED";
+    result.mipgap = Inf;
+    return
+end
+if inc.status == 1
+    fprintf("  CBgen exact solution: aborting MIO solution.\n")
+    result.status = "ABORTED";
+    result.mipgap = Inf;
+    return
+end
+
 
 %--------------------------------------------------------------------------
 % STEP 2: set up and solve the MIO 
