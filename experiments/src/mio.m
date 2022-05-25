@@ -198,9 +198,15 @@ num_outliers_in_q = sum(z((m_normal+1):m,1))
 dist = abs(X*beta_star); 
 if dep_var == true % get error along response direction, recall that beta_1 = -1
     tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
+    sorteddist = sort(dist)
+    tsestar = sum(sorteddist(1:m_normal))
+    tse = sum(sorteddist(1:q))
 else % get orthogonal error
     gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
     edist = abs(dist/gradLen);
+    sortededist = sort(edist)
+    tsestar = sum(sortededist(1:m_normal))
+    tse = sum(sortededist(1:q))
     tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
 end
 
@@ -212,7 +218,7 @@ out_file = fopen(out_fname, "w");
 beta_star
  
 % filename, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - mio-bm or mio1,total squared error to hyperplane (along response or orthogonal, gurobi runtime, gamma 
-fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, result.runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q);
+fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, result.runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar);
 
 fclose(out_file);
 return

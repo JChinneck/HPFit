@@ -117,7 +117,7 @@ if mgood > 0
     % Calculate TSEstar, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
     inc.TSEstar1 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
-    inc.TSEstarout = inc.TSEstar1;
+    inc.TSEstarOut = inc.TSEstar1;
     fprintf("  TSEstar %f\n",inc.TSEstar1)
     %Calculate bnd2
     [weights,RHS] = getPCAHP(Aorig(1:mgood,:));
@@ -185,7 +185,7 @@ if maxDist ~= 0
         inc.RHSOut = inc.RHS2;
         inc.totSqDistAllOut = inc.totSqDistAll2;
         if mgood > 0
-            inc.TSEstarout = inc.TSEstar2;
+            inc.TSEstarOut = inc.TSEstar2;
             inc.totSqDistTruOut = inc.totSqDistTru2;
             inc.closeTruOut = inc.closeTru2;
         end
@@ -251,7 +251,7 @@ if maxDist ~= 0
         inc.RHSOut = inc.RHS3;
         inc.totSqDistAllOut = inc.totSqDistAll3;
         if mgood > 0
-            inc.TSEstarout = inc.TSEstar3;
+            inc.TSEstarOut = inc.TSEstar3;
             inc.totSqDistTruOut = inc.totSqDistTru3;
             inc.closeTruOut = inc.closeTru3;
         end
@@ -264,7 +264,7 @@ if maxDist == 0
     inc.RHSOut = inc.RHS3;
     inc.totSqDistAllOut = inc.totSqDistAll3;
     if mgood > 0
-        inc.TSEstarout = inc.TSEstar3;
+        inc.TSEstarOut = inc.TSEstar3;
         inc.totSqDistTruOut = inc.totSqDistTru3;
     end
 end
