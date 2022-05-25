@@ -1,4 +1,4 @@
-% May 11, 2022
+% May 25, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -63,7 +63,7 @@
 % DEPENDENCIES: this routine calls CBreg, and the external solver Gurobi.
 %  Gurobi has a free academic license.
 
-function [result,output] = CBMIOreg(y,Ain,mioparams,gbparams)
+function [result,output] = CBMIOregV2(y,Ain,mioparams,gbparams)
 
 mtru = mioparams.mtru;
 
@@ -111,11 +111,23 @@ if q == 0
     % Set q based on outFinder results, found in CBreg ouput
     q = inc.q;
 end
-
 output.q = q;
 fprintf("  q set at %d\n",q)
 [output] = update(1,y,Ain,inc.w0Out,inc.weightsOut,q,maxResid,mtru,output);
 output.CBregTime = toc(tStart);
+
+if inc.status == -1
+    fprintf("  CBreg failure: aborting MIO solution.\n")
+    result.status = "ABORTED";
+    result.mipgap = Inf;
+    return
+end
+if inc.status == 1
+    fprintf("  CBreg exact solution: aborting MIO solution.\n")
+    result.status = "ABORTED";
+    result.mipgap = Inf;
+    return
+end
 
 %--------------------------------------------------------------------------
 % STEP 2: set up and solve the MIO 
