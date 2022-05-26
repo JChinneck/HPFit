@@ -1,4 +1,4 @@
-% May 11, 2022
+% May 25, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -33,6 +33,7 @@
 %              > 0: used as an actual residual value to define maxResid
 %                   which defines close points.
 % OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
+%     .status: -1: failure, 0: OK, 1: exact solution (usually because m=n)
 %     .maxResid: the final value of maxResid, points with residuals smaller
 %       than this are counted as "close"
 %     .m[x]: the number of data points when finding the three
@@ -62,6 +63,7 @@
 %      .MAETru[x]: mean absolute residual for the mgood points
 
 function [inc] = CBreg(y,Aorig,inParam)
+inc.status = 0;
 
 if isfield(inParam,'mgood') == 1
     mgood = inParam.mgood;
@@ -83,6 +85,19 @@ tic;
 % Get data table dimensions
 m = size(Aorig,1);
 norig = size(Aorig,2);
+
+if m < norig
+    % Too few points: abort
+    fprintf("  Too few points: aborting. m = %d, n = %d.\n",m,norig)
+    inc.weightsOut = zeros(norig,1);
+    inc.w0Out = 0;
+    inc.residOut = zeros(m,1);
+    inc.maxResid = 0;
+    inc.bnd2 = 0;
+    inc.status = -1;
+    return
+end
+
 if mgood > 0
     fprintf("  Stats: mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
 else
@@ -102,6 +117,19 @@ w0 = beta(1,1);
 w = beta(2:norig+1,1);
 resid = w0 + Aorig*w - y;
 absresid = abs(resid);
+
+if max(absresid) < 1.0e-6
+    % Exact fit, within tolerance
+    fprintf("  Exact fit. Max absolute residual: %f. Note m = %d and n = %d.\n",...
+        max(absresid),m,norig)
+    inc.weightsOut = w;
+    inc.w0Out = w0;
+    inc.residOut = resid;
+    inc.maxResid = 0;
+    inc.bnd2 = 0;
+    inc.status = 1;
+    return
+end
 
 if maxResid < 0
     maxResid = prctile(absresid,-maxResid);
@@ -132,7 +160,6 @@ if mgood > 0
     fprintf("  TSEstar %f. \n",inc.TSEstar1)
 end
 inc.totSqResidAll1 = norm(absresid(:,1).*absresid(:,1),1);
-inc.totSqResidAllOut = inc.totSqResidAll1;
 inc.weights1 = w;
 inc.w01 = w0;
 if maxResid > 0
@@ -140,7 +167,13 @@ if maxResid > 0
     inc.numCloseAllOut = inc.numCloseAll1;
     fprintf("  %d close points\n",inc.numCloseAll1)
 end
+
+% Initialize the output values
 outStep = 1;
+inc.weightsOut = inc.weights1;
+inc.w0Out = inc.w01;
+inc.residOut = inc.resid1;
+inc.totSqResidAllOut = inc.totSqResidAll1;
 
 % Analyze and remove outliers ---------------------------------------------
 
@@ -175,7 +208,6 @@ w = beta(2:norig+1,1);
 resid = w0 + Aorig*w - y;
 absresid = abs(resid);
 
-inc.residOut = resid;
 inc.resid2 = resid;
 if mgood > 0
     inc.totSqResidTru2 = norm(absresid(1:mgood,1).*absresid(1:mgood,1),1);
@@ -197,8 +229,6 @@ if maxResid > 0
 end
 inc.weights2 = w;
 inc.w02 = w0;
-inc.w0Out = w0;
-inc.weightsOut=w;
 
 % Update output solution if appropriate
 if maxResid ~= 0
@@ -379,7 +409,7 @@ end
 
 % principal component axes
 [~,score,~] = pca(A);
-for j=1:n
+for j=1:size(score,2)
     absDiffs = abs(score(:,j) - median(score(:,j)));
     % Offset in case of zero median
     fracDiffs = absDiffs/(median(absDiffs)+1);

@@ -1,23 +1,25 @@
-% May 11, 2022
+% May 26, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
 %   Virginia Commonwealth University, Richmond, Virginia, USA
 
-% Finds a best fitting hyperplane using mixed-integer optimization and an 
-% advanced start provided by CBgen. The steps are:
-% 1. Run CBgen to obtain heuristic solution
-% 2. Run the improved MIO minimization of the qth percentile error, in the
-%    sorted set of errors, subject to the time limit.
-% 3. Places a PCA hyperplane on the q points kept by the MIO solution.
-% 4. Checks which points are outliers relative to the step 2 HP. Outliers
+% Finds a best fitting regressionhyperplane using mixed-integer optimization 
+% and an advanced start provided by CBreg. The steps are:
+% 1. Run CBreg to obtain heuristic solution
+% 2. MIO1: run the improved MIO minimization of the qth percentile error, 
+%    in the sorted set of errors, subject to the time limit.
+% 3. MIO2: place a PCA hyperplane on the q points kept by the MIO solution.
+% 4. MIO3: check which points are outliers relative to the step 2 HP. Outliers
 %    removed, nonoutliers kept, and a final HP is placed. Generally there
 %    is likely to be only reintroduction of points that are not outliers.
 %
-%NOTE: hyperplane equations have the form: w_1*x_1 + w_2*x_2 + .... = RHS
+%NOTE: The regression equation is w0 + w1x1 + w2x2 + ... + wnxn = y,
+% so a column of ones is added at the beginning of the input Ain matrix
 %
 %INPUTS:
-%  Ain: the data matrix
+%  y: the output variable values
+%  Ain: the data matrix (points x predictor variables)
 %  mioparams: struct containing the CB and MIO control parameters:
 %    .mtru: the number of inliers, if known. Useful in generating
 %      statistics for testing purposes. Not used if < 1. If used, then the
@@ -26,16 +28,15 @@
 %      - if q > 0 it is the percentile of the m points in the data set
 %      - if q < 0 then -q is the actual ordinal number (not percentile)
 %      - if q = 0 then take the q from CBgen
-%    .maxDist: points closer than this distance to a hyperplane are
-%      "close". Distance is Euclidean.
+%    .maxResid: points with residual error less than this are "close". 
 %      There are 3 cases:
-%         < 0: -maxDist is the percentile of distances from the first
+%         < 0: -maxResid is the percentile of residuals for the first
 %               hyperplane. Note it is in %. 
-%               NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
-%               If maxDist is not specified, then -16 is used.
+%               NOTE: maxResid = -16 IS HIGHLY RECOMMENDED.
+%               If maxResid is not specified, then -16 is used.
 %         = 0: means that closeAll is not used to help identify the
 %              best hyperplane. Result is just the final hyperplane.
-%         > 0: an actual Euclidean distance to define maxDist. 
+%         > 0: an actual residual to define maxDist. 
 %  gbparams: struct containing all of the Gurobi control parameters
 %    Sample values:
 %      .TimeLimit = 3600;
@@ -44,27 +45,25 @@
 %  result: the Gurobi result struct
 %  output: the fitted hyperplane output struct, with these fields:
 %    .w: the weights for the fitted hyperplane
-%    .RHS: value of constant in the hyperplane expression
-%    .gamma(k,1): the minimum value of the Euclidean error at the qth percentile
-%    .TSEstar(k,1): if mtru > 0, the sum of the squared Euclidean distances
-%       for the mtru points closest to the fitted hyperplane, for each of 
-%       the steps, plus output:
+%    .gamma(k,1): the minimum value of the residual at the qth percentile
+%    .TSEstar(k,1): if mtru > 0, the sum of the squared residuals
+%       for the mtru smallest residuals, for each of the steps, plus output:
 %         k=1: CBgen result, if used
 %         k=2: MIO result
 %         k=3: PCA on MIO output
 %         k=4: reinstatement, then final PCA
-%    .TSE(k,1): the sum of the squared Euclidean distances for the q points 
-%       closest to the fitted hyperplane, for each of the steps, plus output
-%    IF maxDist ~= 0, then these values are also calculated:
-%      .closeAll(k,1): the number of points within a Euclidean distance of 
-%        less than maxDist from the hyperplane
-%      .bnd2: sum of squared Euclidean distances to a hyperplane fit to the
+%    .TSE(k,1): the sum of the squared residuals for the q points 
+%       having the smallest residuals, for each of the steps, plus output
+%    IF maxResid ~= 0, then these values are also calculated:
+%      .closeAll(k,1): the number of points having a residual of 
+%        less than maxResid
+%      .bnd2: sum of squared residuals to a regression hyperplane fit to the
 %        mtru input points
 %
-% DEPENDENCIES: this routine calls CBgen and the external solver Gurobi.
-%   Gurobi is free for academics.
+% DEPENDENCIES: this routine calls CBreg, and the external solver Gurobi.
+%  Gurobi has a free academic license.
 
-function [result,output] = CBMIOgen(Ain,mioparams,gbparams)
+function [result,output] = CBMIOreg(y,Ain,mioparams,gbparams)
 
 mtru = mioparams.mtru;
 
@@ -73,13 +72,15 @@ output.TSEstar = zeros(4,1) - 1;
 output.TSE = zeros(4,1) - 1;
 output.closeAll = zeros(4,1) - 1;
 output.gamma = zeros(4,1) - 1;
-output.maxDist = -1;
+output.maxResid = -1;
 
 tStart = tic;
 
-% get m, n, and specific q
-m = size(Ain,1);
-n = size(Ain,2);
+% The regression equation is w0 + w1x1 + w2x2 + ... + wnxn = y,
+% so a column of ones is added at the beginning of Ain for w0
+A = [ones(size(Ain,1),1),Ain];
+m = size(A,1);
+n = size(A,2);
 
 % set an integer value of q
 q = mioparams.q;
@@ -94,27 +95,40 @@ else
 end
 
 %--------------------------------------------------------------------------
-% STEP 1: run CBgen
+% STEP 1: run CBreg
 
-fprintf("-----CBgen starts-----\n")
-CBparam.maxDist = mioparams.maxDist;
+fprintf("-----CBreg starts-----\n")
+CBparam.maxResid = mioparams.maxResid;
 CBparam.mgood = mioparams.mtru;
-[inc] = CBgen(Ain,CBparam);
-fprintf("-----CBgen ends-----\n")
-maxDist = inc.maxDist;
-output.maxDist = maxDist;
+[inc] = CBreg(y,Ain,CBparam);
+fprintf("-----CBreg ends-----\n")
+maxResid = inc.maxResid;
+output.maxResid = maxResid;
 output.bnd2 = inc.bnd2;
-fprintf("  CBgen sets maxDist at %f\n",maxDist)
+fprintf("  CBreg sets maxResid at %f\n",maxResid)
 
 if q == 0
-    % Set q based on outFinder results, found in CBgen ouput
+    % Set q based on outFinder results, found in CBreg ouput
     q = inc.q;
 end
+
 output.q = q;
 fprintf("  q set at %d\n",q)
+[output] = update(1,y,Ain,inc.w0Out,inc.weightsOut,q,maxResid,mtru,output);
+output.CBregTime = toc(tStart);
 
-[output] = update(1,Ain,inc.weightsOut,inc.RHSOut,q,maxDist,mtru,output);
-output.CBgenTime = toc(tStart);
+if inc.status == -1
+    fprintf("  CBreg failure: aborting MIO solution.\n")
+    result.status = "ABORTED";
+    result.mipgap = Inf;
+    return
+end
+if inc.status == 1
+    fprintf("  CBreg exact solution: aborting MIO solution.\n")
+    result.status = "ABORTED";
+    result.mipgap = Inf;
+    return
+end
 
 %--------------------------------------------------------------------------
 % STEP 2: set up and solve the MIO 
@@ -126,18 +140,16 @@ tMIOstart = tic;
 % col order: n w, m eplus, m eminus, m rel, m z, 1 gamma
 model.A = sparse(2*m+1,n+4*m+1);
 model.rhs = zeros(2*m+1,1);
-% Elastic cons, of form % w1x1 + w2x2 + ... +wnxn + eplus - eminus = n. 
-% Note arbitrary choice of n for the constant
+% m Elastic cons, of form w0 + w1x1 + w2x2 + ... +wnxn + eplus - eminus = y. 
 output.w = zeros(n,1);
-output.w0 = n;
-model.A(1:m,1:n+2*m) = [sparse(Ain),speye(m),-speye(m)];
-model.rhs(1:m,1) = zeros(m,1) + n;
+model.A(1:m,1:n+2*m) = [sparse(A),speye(m),-speye(m)];
+model.rhs(1:m,1) = y;
 model.sense(1:m,1) = repmat('=',m,1);
-% error constraints
+% m error constraints, of form eplus_i + eminus_i - rel_i - gamma < 0
 model.A(m+1:2*m,n+1:n+3*m) = [speye(m),speye(m),-speye(m)];
 model.A(m+1:2*m,n+4*m+1) = sparse(-ones(m,1));
 model.sense(m+1:2*m,1) = repmat('<',m,1);
-% the q equation
+% the q equation, of form sum(Z) = q
 model.A(2*m+1,n+3*m+1:n+4*m) = sparse(ones(1,m));
 model.rhs(2*m+1,1) = q;
 model.sense(2*m+1,1) = '=';
@@ -158,33 +170,32 @@ model.vtype = [repmat('C',n+3*m,1);repmat('B',m,1);'C'];
 model.obj = [zeros(n+4*m,1);1.0];
 model.modelsense = 'min';
 
-% Use the CBgen advanced start
-% First rescale the CBgen hyperplane to have RHS = n
-weights = inc.weightsOut/inc.RHSOut * n;
+% Use the CBreg advanced start
 % Initialize some variables
 eplus = zeros(m,1);
 eminus = zeros(m,1);
 rel = zeros(m,1);
 z = zeros(m,1);
-% Calculate dists with new HP eqn
-dist = Ain*weights - n;
-absdist = abs(dist);
-sortedabsdist = sort(absdist);
-gamma = sortedabsdist(q,1);
+% Calculate gamma for CBreg eqn
+sortedabsresid = sort(abs(inc.residOut));
+gamma = sortedabsresid(q,1);
+
 for i=1:m
-   if dist > 0
-       eplus(i,1) = dist(i,1);
+   if inc.residOut(i,1) > 0
+       eminus(i,1) = inc.residOut(i,1);
    else
-       eminus(i,1) = -dist(i,1);
+       eplus(i,1) = -inc.residOut(i,1);
    end
-   if absdist(i,1) <= gamma
+   if abs(inc.residOut(i,1)) <= gamma
        z(i,1) = 1;
+       rel(i,1) = 0;
    else
-       rel(i,1) = 1;
+       rel(i,1) = abs(inc.residOut(i,1));
    end
 end
+
 model.StartNumber = 0;
-model.start = [weights; eplus; eminus; rel; z; gamma];
+model.start = [inc.w0Out;inc.weightsOut; eplus; eminus; rel; z; gamma];
 
 % solve the model
 result = gurobi(model, gbparams);
@@ -200,8 +211,8 @@ result = gurobi(model, gbparams);
 % get results
 fprintf("  MIO solution status: %s\n",result.status)
 if strcmp(result.status, 'OPTIMAL')
-    mioOut.w = result.x(1:n,1);
-    mioOut.RHS = n;
+    mioOut.w0 = result.x(1,1);
+    mioOut.w = result.x(2:n,1);
 %     eplus = result.x(n+1:n+m,1);
 %     eminus = result.x(n+m+1:n+2*m,1);
 %     rel = result.x(n+2*m+1:n+3*m,1);
@@ -212,8 +223,8 @@ else
         % Gurobi stopped for some reason, maybe time limit, but it has an
         % incumbent solution, so use that
         fprintf("  Using incumbent solution\n")
-        mioOut.w = result.pool(1).xn(1:n,1);
-        mioOut.RHS = n;
+        mioOut.w0 = result.pool(1).xn(1,1);
+        mioOut.w = result.pool(1).xn(2:n,1);
 %         eplus = result.pool(1).xn(n+1:n+m,1);
 %         eminus = result.pool(1).xn(n+m+1:n+2*m,1);
 %         rel = result.pool(1).xn(n+2*m+1:n+3*m,1);
@@ -228,55 +239,67 @@ end
 fprintf("  MIO gamma %f at q = %d\n",mioOut.gamma,q)
 
 % Update solution
-[output] = update(2,Ain,mioOut.w,mioOut.RHS,q,maxDist,mtru,output);
+[output] = update(2,y,Ain,mioOut.w0,mioOut.w,q,maxResid,mtru,output);
 output.MIOTime = toc(tMIOstart);
 fprintf("  MIO solution time %f\n",output.MIOTime)
 
 %-------------------------------------------------------------------------
-% STEP 3: PCA solution on the retained points from the MIO, indexed by z
+% STEP 3: multiple regression solution on the retained points from the MIO,
+% indexed by z
 
-Anew = zeros(m,n);
+Anew = zeros(m,n-1);
+ynew = zeros(m,1);
 mnew = 0;
 for i=1:m
    if z(i,1)
        mnew = mnew + 1;
        Anew(mnew,:) = Ain(i,:);
+       ynew(mnew,1) = y(i,1);
    end
 end
 Anew = Anew(1:mnew,:);
-fprintf("Running PCA on %d points retained after MIO.\n",mnew)
-[weights,RHS] = getPCAHP(Anew);
+ynew = ynew(1:mnew,1);
+Anew = [ones(mnew,1),Anew];
+fprintf("Running multiple regression on %d points retained after MIO.\n",mnew)
+beta = regress(ynew,Anew);
+w0 = beta(1,1);
+w = beta(2:n,1);
 
 % Update solution
-[output] = update(3,Ain,weights,RHS,q,maxDist,mtru,output);
+[output] = update(3,y,Ain,w0,w,q,maxResid,mtru,output);
 
 %--------------------------------------------------------------------------
 % STEP 4: check which points are outliers relative to the HP found in step
 % 3 and ignore those, but reinstate points that are not outliers relative
-% to that HP. Find a final HP via PCA.
+% to that HP. Find a final HP via multiple regression.
 
-% Calculate edist
-dist = Ain*weights - RHS;
-gradLen = norm(weights);
-edist = abs(dist/gradLen);
-TF = isoutlier(edist);
-Anew = zeros(m,n);
+% Calculate residuals
+resid = w0 + Ain*w - y;
+absresid = abs(resid);
+TF = isoutlier(absresid);
+Anew = zeros(m,n-1);
+ynew = zeros(m,1);
 mnew = 0;
 for i=1:m
    if ~TF(i,1)
        mnew = mnew + 1;
        Anew(mnew,:) = Ain(i,:);
+       ynew(mnew,1) = y(i,1);
    end
 end
 Anew = Anew(1:mnew,:);
-fprintf("Reinstating/removing points relative to last hyperplane, and rerunning PCA on %d pts\n",mnew)
-
-[weights,RHS] = getPCAHP(Anew);
+Anew =[ones(mnew,1),Anew];
+ynew = ynew(1:mnew,1);
+fprintf("Reinstating/removing points relative to last hyperplane, and rerunning multiple regression on %d pts\n",mnew)
+beta = regress(ynew,Anew);
+w0 = beta(1,1);
+w = beta(2:n,1);
 
 % Update solution
-[output] = update(4,Ain,weights,RHS,q,maxDist,mtru,output);
-output.w = weights;
-output.RHS = RHS;
+[output] = update(4,y,Ain,w0,w,q,maxResid,mtru,output);
+
+output.w0 = w0;
+output.w = w;
 output.solTime  = toc(tStart);
 fprintf("Solution time: %f\n",output.solTime);
 
@@ -285,27 +308,25 @@ end
 
 %--------------------------------------------------------------------------
 % Make calculations and updates at step k
-function [output] = update(k,A,weights,RHS,q,maxDist,mtru,output)
-% Calculate the point distances from the hyperplane
-dist = A*weights - RHS;
-% Calculate the Euclidean point distances from the hyperplane
-gradLen = norm(weights);
-edist = abs(dist/gradLen);
-sortededist = sort(edist);
-output.gamma(k,1) = sortededist(q,1);
+function [output] = update(k,y,A,w0,w,q,maxResid,mtru,output)
+% Calculate the residuals
+resid = w0 + A*w - y;
+absresid = abs(resid);
+sortedresid = sort(absresid);
+output.gamma(k,1) = sortedresid(q,1);
 fprintf("  gamma %f at q = %d\n",output.gamma(k,1),q)
 % Calculate TSE
-output.TSE(k,1) = norm(sortededist(1:q,1).*sortededist(1:q,1),1);
+output.TSE(k,1) = norm(sortedresid(1:q,1).*sortedresid(1:q,1),1);
 fprintf("  TSE %f at q = %d\n",output.TSE(k,1),q);
 if mtru > 0
     % Calculate TSEstar
-    output.TSEstar(k,1) = norm(sortededist(1:mtru,1).*sortededist(1:mtru,1),1);
+    output.TSEstar(k,1) = norm(sortedresid(1:mtru,1).*sortedresid(1:mtru,1),1);
     fprintf("  TSEstar %f at mtru = %d\n",output.TSEstar(k,1),mtru);
 end
-if maxDist > 0
-    output.closeAll(k,1) = sum(edist <= maxDist);
+if maxResid > 0
+    output.closeAll(k,1) = sum(absresid <= maxResid);
     fprintf("  %d close points\n",output.closeAll(k,1));
-    output.TSEstar(k,1) = norm(sortededist(1:mtru,1).*sortededist(1:mtru,1),1);
+    output.TSEstar(k,1) = norm(sortedresid(1:mtru,1).*sortedresid(1:mtru,1),1);
 end
 
 return
