@@ -1,4 +1,4 @@
-% May 11, 2022
+% May 25, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -29,6 +29,7 @@
 %                   best hyperplane. Result is just the 3rd hyperplane.
 %              > 0: an actual Euclidean distance to define maxDist.
 % OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
+%     .status: -1: failure, 0: OK, 1: exact solution (usually because m=n)
 %     .maxDist: the final value of maxDist, points closer than maxDist to
 %       a hyperplane are counted as being "close" to it 
 %     .m[x]: the number of data points when finding the hyperplanes
@@ -55,6 +56,7 @@
 %        calculating the TSEstar for those points. 
 
 function [inc] = CBgen(Aorig,inParam)
+inc.status = 0;
 
 fprintf("Input parameters:\n");
 fprintf("  mgood %d\n",inParam.mgood)
@@ -72,6 +74,19 @@ tic;
 % Get data table dimensions
 m = size(Aorig,1);
 norig = size(Aorig,2);
+
+if m < norig
+    % Too few points: abort
+    fprintf("  Too few points: aborting. m = %d, n = %d.\n",m,norig)
+    inc.weightsOut = zeros(norig,1);
+    inc.RHSOut = 0;
+    inc.edistOut = zeros(m,1);
+    inc.bnd2 = 0;
+    inc.status = -1;
+    return
+end
+
+
 % Print some stats to console
 if mgood > 0
     fprintf("  Stats: mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
@@ -88,6 +103,18 @@ dist = Aorig*weights - RHS;
 % Calculate the Euclidean point distances from the hyperplane
 gradLen = norm(weights);
 edist = abs(dist/gradLen);
+
+if max(edist) < 1.0e-6
+    % Exact fit, within tolerance
+    fprintf("  Exact fit. Max absolute Euclidean error: %f. Note m = %d and n = %d.\n",...
+        max(edist),m,norig)
+    inc.weightsOut = w;
+    inc.RHSOut = w0;
+    inc.edistOut = edist;
+    inc.bnd2 = 0;
+    inc.status = 1;
+    return
+end
 
 % Find maxDist automatically if not prespecified
 if maxDist < 0
@@ -276,7 +303,7 @@ if maxDist ~= 0
     fprintf("  %d close points\n",inc.closeAllOut)
 end
 if mgood > 0
-    fprintf("  TSEstar %f\n",inc.TSEstarout)
+    fprintf("  TSEstar %f\n",inc.TSEstarOut)
 end
 
 % Calculate the estimated number of inliers at output (inc.qout)
