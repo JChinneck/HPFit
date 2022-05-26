@@ -1,3 +1,5 @@
+% ACTUALLY A COPY OF CBMIOreg: wait for new version of CBMIOgen to be uploaded here.
+
 % May 26, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada

@@ -1,4 +1,4 @@
-% May 25, 2022
+% May 26, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -63,7 +63,7 @@
 % DEPENDENCIES: this routine calls CBreg, and the external solver Gurobi.
 %  Gurobi has a free academic license.
 
-function [result,output] = CBMIOregV2(y,Ain,mioparams,gbparams)
+function [result,output] = CBMIOreg(y,Ain,mioparams,gbparams)
 
 mtru = mioparams.mtru;
 
@@ -111,6 +111,7 @@ if q == 0
     % Set q based on outFinder results, found in CBreg ouput
     q = inc.q;
 end
+
 output.q = q;
 fprintf("  q set at %d\n",q)
 [output] = update(1,y,Ain,inc.w0Out,inc.weightsOut,q,maxResid,mtru,output);
@@ -139,16 +140,16 @@ tMIOstart = tic;
 % col order: n w, m eplus, m eminus, m rel, m z, 1 gamma
 model.A = sparse(2*m+1,n+4*m+1);
 model.rhs = zeros(2*m+1,1);
-% Elastic cons, of form % w0 + w1x1 + w2x2 + ... +wnxn + eplus - eminus = y. 
+% m Elastic cons, of form w0 + w1x1 + w2x2 + ... +wnxn + eplus - eminus = y. 
 output.w = zeros(n,1);
 model.A(1:m,1:n+2*m) = [sparse(A),speye(m),-speye(m)];
 model.rhs(1:m,1) = y;
 model.sense(1:m,1) = repmat('=',m,1);
-% error constraints
+% m error constraints, of form eplus_i + eminus_i - rel_i - gamma < 0
 model.A(m+1:2*m,n+1:n+3*m) = [speye(m),speye(m),-speye(m)];
 model.A(m+1:2*m,n+4*m+1) = sparse(-ones(m,1));
 model.sense(m+1:2*m,1) = repmat('<',m,1);
-% the q equation
+% the q equation, of form sum(Z) = q
 model.A(2*m+1,n+3*m+1:n+4*m) = sparse(ones(1,m));
 model.rhs(2*m+1,1) = q;
 model.sense(2*m+1,1) = '=';
@@ -178,18 +179,21 @@ z = zeros(m,1);
 % Calculate gamma for CBreg eqn
 sortedabsresid = sort(abs(inc.residOut));
 gamma = sortedabsresid(q,1);
+
 for i=1:m
    if inc.residOut(i,1) > 0
-       eplus(i,1) = inc.residOut(i,1);
+       eminus(i,1) = inc.residOut(i,1);
    else
-       eminus(i,1) = -inc.residOut(i,1);
+       eplus(i,1) = -inc.residOut(i,1);
    end
    if abs(inc.residOut(i,1)) <= gamma
        z(i,1) = 1;
+       rel(i,1) = 0;
    else
-       rel(i,1) = 1;
+       rel(i,1) = abs(inc.residOut(i,1));
    end
 end
+
 model.StartNumber = 0;
 model.start = [inc.w0Out;inc.weightsOut; eplus; eminus; rel; z; gamma];
 
