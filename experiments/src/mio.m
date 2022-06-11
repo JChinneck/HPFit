@@ -42,7 +42,7 @@
 % - iteration: iteration number.  Used in the output filename.
 % - datafname: full path to data file.
 % - lqs_beta: an initial solution generated using LQS as implemented
-%             in R.
+%             in R. If -10, not lqs_beta provided.
 % - m_normal: number of non-outlier rows of data.  After that they are
 %             outliers.
 % - resloc: path to folder where output file will reside.
@@ -140,18 +140,18 @@ disp("alg 3 end")
 if strcmp(formulation, "mio-bm")
     model.StartNumber = 0;
     model.start = [nan; NaN(5*m,1);   beta1];  % from algorithm 3
-    if lqs_beta ~= -1 % if a solution given by R's LQS method is given, provide a second start
-        model.StartNumber = 1;
-        model.start = [nan; NaN(5*m,1) ; lqs_beta]; 
-    end
+    %if lqs_beta ~= -10 % if a solution given by R's LQS method is given, provide a second start
+    %    model.StartNumber = 1;
+    %    model.start = [nan; NaN(5*m,1) ; lqs_beta]; 
+    %end
 else %MIO1
     model.StartNumber = 0;
     model.start = [nan; NaN(4*m,1);   beta1];  % from algorithm 3
 
-    if lqs_beta ~= -1 % if a solution given by R's LQS method is given, provide a second start
-        model.StartNumber = 1;
-        model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
-    end
+    %if lqs_beta ~= -10 % if a solution given by R's LQS method is given, provide a second start
+    %    model.StartNumber = 1;
+    %    model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
+    %end
 end
 
 model.modelsense = 'min';
@@ -198,13 +198,13 @@ num_outliers_in_q = sum(z((m_normal+1):m,1))
 dist = abs(X*beta_star); 
 if dep_var == true % get error along response direction, recall that beta_1 = -1
     tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
-    sorteddist = sort(dist)
+    sorteddist = sort(dist(:,1).*dist(:,1));
     tsestar = sum(sorteddist(1:m_normal))
     tse = sum(sorteddist(1:q))
 else % get orthogonal error
     gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
     edist = abs(dist/gradLen);
-    sortededist = sort(edist)
+    sortededist = sort(edist(:,1).*edist(:,1));
     tsestar = sum(sortededist(1:m_normal))
     tse = sum(sortededist(1:q))
     tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));

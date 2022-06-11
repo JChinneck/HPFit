@@ -20,8 +20,6 @@
 #         are chosen to ensure high breakdown
 #  - lts: least trimmed squares regression 
 #  - lqs: least quartile of squares regression
-#  - rbm: relative better method of JWC
-#  - rbmmio3: RBM plus revised MIO formulation
 #  - alg3: Algorithm 3 from Bertsimas and Mazumder (2014), designed 
 #           as a warmup to MIO
 #
@@ -505,7 +503,7 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
           lqs_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "lqs", lqs_dist, lqs_rq, lqs_time[1], lqs_time[2], lqs_time[3], lqs_lts, sep=",")
           write(lqs_out, file=paste(resloc, "/lqsi", i, ".csv", sep=""))
       } else {
-          lqs_beta <- -1
+          lqs_beta <- -10
       }
   }
   print("lqs_beta")
@@ -656,7 +654,7 @@ no_hbreg <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mose
           lqs_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "lqs", lqs_dist, lqs_rq, lqs_time[1], lqs_time[2], lqs_time[3], lqs_lts, sep=",")
           write(lqs_out, file=paste(resloc, "/lqsi", i, ".csv", sep=""))
       } else {
-          lqs_beta <- -1
+          lqs_beta <- -10
       }
   }
   print("lqs_beta")

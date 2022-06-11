@@ -92,7 +92,7 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   cat("\n", i, "\n")
   X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE) # read data
 
-  lqs_beta <- -1
+  lqs_beta <- -10
   if (calc_lqs_beta == TRUE) {
       if (dep_var == TRUE) { # response is first variable
           if (q==1.0) {

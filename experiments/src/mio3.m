@@ -42,7 +42,7 @@
 % - iteration: iteration number.  Used in the output filename.
 % - datafname: full path to data file.
 % - lqs_beta: initial solution generate using LQS in R; a warmstart 
-%   for MIO3
+%   for MIO3; if -10, none is provided
 % - m_normal: the  number of non-outlier rows of data.
 % - resloc: path to folder where output file will reside.
 % - timelimit: time limit for MIP solver.
@@ -103,19 +103,19 @@ function [beta_star, f_beta_star] = mio3(iteration, datafname,q, lqs_beta, m_nor
  
     % get algorithm 3 warm start
     tic;
-    if lqs_beta ~= -1 % only if an LQS warm start is provided
+    if lqs_beta ~= -10 % only if an LQS warm start is provided
         disp("algorithm 3")
-        [beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA");
+        [beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA")
         disp("finished algorithm 3")
     end
     alg3_time = toc;
     %mio1
     lqs_beta
-    if lqs_beta ~= -1
+    if lqs_beta ~= -10
         model.StartNumber = 1; % from alg3
         model.start = [nan; NaN(4*m,1);   beta1];  % set alg3 warm start
-        model.StartNumber = 2; % from LQS
-        model.start = [nan; NaN(4*m,1) ; lqs_beta]; % set LQS warm start
+        %model.StartNumber = 2; % from LQS
+        %model.start = [nan; NaN(4*m,1) ; lqs_beta]; % set LQS warm start
     end
 
     model.modelsense = 'min';

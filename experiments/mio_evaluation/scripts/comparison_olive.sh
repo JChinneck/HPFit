@@ -6,12 +6,12 @@
 # tell SGE that it's an array and job numbers
 #$ -t 1-6:1
 # tell SGE to run at most 2 jobs at once
-#$ -tc 6
+#$ -tc 2
 
 FOLNAME=olive # folder where data is
 EXP=mio_evaluation # experiment
 JOBNAME=comparison # name of job on SGE
-TIMELIMIT=15
+TIMELIMIT=3600
 Q=0.50
 DEP_VAR=TRUE
 
@@ -31,13 +31,13 @@ echo "library(MASS)" > $RESLOC/hyper.$ID.in
 echo "library(matlabr)" >> $RESLOC/hyper.$ID.in
 echo "options(matlab.path='/usr/local/MATLAB/R2018b/bin')" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/run_mio.R\")" >> $RESLOC/hyper.$ID.in
-#echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio-bm\", $TIMELIMIT, \"$RESLOC\", TRUE)" >> $RESLOC/hyper.$ID.in
-#echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio3\", $TIMELIMIT, \"$RESLOC\", TRUE)" >> $RESLOC/hyper.$ID.in
+echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio-bm\", $TIMELIMIT, \"$RESLOC\", TRUE)" >> $RESLOC/hyper.$ID.in
+echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio3\", $TIMELIMIT, \"$RESLOC\", TRUE)" >> $RESLOC/hyper.$ID.in
 echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"cbmio3\", $TIMELIMIT, \"$RESLOC\", FALSE)" >> $RESLOC/hyper.$ID.in
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
 rm $RESLOC/hyper.$ID.in
-#rm $RESLOC/$ID.Rout
+#rm $RESLOC/log/$ID.Rout
 rm $HOME/$JOBNAME.e*
 rm $HOME/$JOBNAME.o*

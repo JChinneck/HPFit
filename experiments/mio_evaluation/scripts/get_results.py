@@ -9,7 +9,7 @@ loc="/home/jpbrooks/HPFit/experiments/mio_evaluation/results"
 experiment="comparison"
 writer = pd.ExcelWriter(loc + "/" + experiment + ".xlsx", mode="w")
 
-folnames = ["olive"]
+folnames = ["olive", "bm", "rvd"]
 
 for folname in folnames:
     results={}
@@ -83,6 +83,7 @@ for folname in folnames:
                              "mio-bm tse","mio1 tse","mio2 tse","mio3 tse","cbmio1 tse","cbmio2 tse","cbmio3 tse","cbmio4 tse",
                              "mio-bm tsestar","mio1 tsestar","mio2 tsestar","mio3 tsestar","cbmio1 tsestar","cbmio2 tsestar","cbmio3 tsestar","cbmio4 tsestar"
                              ]]
+    results_df.sort_values(by=["i"], inplace=True)
     results_df.to_excel(writer, sheet_name=folname, float_format="%f")
 
 writer.close()
