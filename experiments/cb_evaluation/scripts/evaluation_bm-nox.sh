@@ -9,15 +9,15 @@
 #$ -tc 3
 
 FOLNAME=bm-nox # folder where data is
-EXP=rbm_evaluation # experiment
-JOBNAME=evaluation # name of job on SGE and location of results
-TIMELIMIT=300 # used for RBM-MIO3
+EXP=cb_evaluation # experiment
+JOBNAME=evaluation # name of job on SGE
+TIMELIMIT=60 # used for CB-MIO3
 Q=0.50
 DEP_VAR=TRUE
 
-SRCLOC=$HOME/hyperplane_fitting/src
-DATALOC=$HOME/hyperplane_fitting/$EXP/data/$FOLNAME
-RESLOC=$HOME/hyperplane_fitting/$EXP/results/$JOBNAME/$FOLNAME
+SRCLOC=$HOME/HPFit/experiments/src
+DATALOC=$HOME/HPFit/experiments/$EXP/data/$FOLNAME
+RESLOC=$HOME/HPFit/experiments/$EXP/results/$JOBNAME/$FOLNAME
 MOSEKLOC=$HOME/src/mosek/9.3/toolbox/r2015a
 SEEDFILE=$DATALOC/$FOLNAME.in
 mkdir -p $RESLOC # make folder for results
@@ -38,6 +38,6 @@ echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
 #rm $RESLOC/hyper.$ID.in
-#rm $RESLOC/$ID.Rout
+rm $RESLOC/$ID.Rout
 rm $HOME/$JOBNAME.e*
 rm $HOME/$JOBNAME.o*
