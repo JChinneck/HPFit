@@ -36,7 +36,7 @@
 %               If maxResid is not specified, then -16 is used.
 %         = 0: means that closeAll is not used to help identify the
 %              best hyperplane. Result is just the final hyperplane.
-%         > 0: an actual residual to define maxDist. 
+%         > 0: an actual residual to define maxResid. 
 %  gbparams: struct containing all of the Gurobi control parameters
 %    Sample values:
 %      .TimeLimit = 3600;
