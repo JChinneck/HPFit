@@ -19,7 +19,6 @@
 %   coefficient is set to -1.  When one is not specified, the 
 %   intercept is set to n.
 % - a result datafile is created containing the data file with 
-% filename, total number of points, number of variables, number of non-outliers, percentile for LQS, formulation- cbmio3, 
 % bnd2,  gurobi runtime, gamma, 
 % TSEstar after CB, TSE after CB, gamma after CB
 % TSEstar after MIO, TSE after MIO, gamma after MIO
@@ -50,6 +49,7 @@ gbparams.TimeLimit = timelimit;
 mioparams.mtru = m_normal;
 mioparams.q = q;
 mioparams.maxResid = -16;
+mioparams.maxDist = -16;
 
 out_fname = strcat(resloc, "/", formulation, "i", int2str(iteration), ".csv")
 disp(out_fname)

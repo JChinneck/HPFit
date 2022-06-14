@@ -519,13 +519,11 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
   # need to run RBM and get RBM start
   # run rbm when dep_var is FALSE
   if (dep_var == TRUE) {
-    run_matlab_code(paste(add_path, " ", "rbm(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "')", sep=""))
-    run_matlab_code(paste(add_path, " ", make_lqs_beta, " ",  "rbmmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "',", timelimit, ",lqs_beta)", sep=""))
+    run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", "cbmio3", "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
     run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "','PCA')", sep=""))
   } else {
     print(add_path)
-    run_matlab_code(paste(add_path, " ", "rbm(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "')", sep=""))
-    run_matlab_code(paste(add_path, " ", make_lqs_beta, " ",  "rbmmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "',", timelimit, ",lqs_beta)", sep=""))
+    run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", "cbmio3", "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
     if (n <= 500) {
       run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "','PCA')", sep=""))
     }

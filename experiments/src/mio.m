@@ -12,9 +12,11 @@
 % Main versions and options:
 % formulation:
 %   - mio-bm: the original MIP formulation presented in (2.11) of 
-%             Bertsimas and Mazumder (2014).
+%             Bertsimas and Mazumder (2014).  Warm start with alg3.
 %   - mio1: an equivalent but more compact formualtion developed by
-%           JC.
+%           JC.  Warm start with alg3.
+%   - lqs-mio-bm: mio-bm warmstarted with LQS.
+%   - lqs-mio1: mio1 warmstarted with LQS.
 % dep_var:
 %   - true: a dependent variable is specified, as in ordinary 
 %           regression.  A residual is measured as the absolute 
@@ -74,7 +76,7 @@ end
 
 
 % Set up the MIP
-if strcmp(formulation, "mio-bm")
+if strcmp(formulation, "mio-bm") or strcmp(formulation, "lqs-mio-bm")
     model.obj = [1.0; zeros(2*m,1) ; zeros(m,1); zeros(m,1); zeros(m,1); zeros(n,1)]; % gamma ; rplus/rminus; mu; mubar; z; beta
     model.lb  = [zeros(1+5*m,1); -inf(n,1)];
     if dep_var == true % dependent variable - regression; first variable is response
@@ -121,7 +123,7 @@ else % formulation is MIO1
     model.varnames = cellstr(['gamma' ; repmat('r',m, 1) + string(1:m)' ; repmat('eplus',m, 1) + string(1:m)' ; repmat('eminus',m, 1) + string(1:m)' ; repmat('z',m, 1) + string(1:m)' ; repmat('beta',n, 1) + string(1:n)']) 
 end
 for k=1:m
-    if strcmp(formulation, "mio-bm")
+    if strcmp(formulation, "mio-bm") or strcmp(formulation, "lqs-mio-bm")
         model.sos(k).type = 1;
         model.sos(k).index = [(1+2*m+m+k) (1+2*m+k)]'; % mubar, mu
         model.sos(m+k).type = 1;
@@ -140,18 +142,19 @@ disp("alg 3 end")
 if strcmp(formulation, "mio-bm")
     model.StartNumber = 0;
     model.start = [nan; NaN(5*m,1);   beta1];  % from algorithm 3
-    %if lqs_beta ~= -10 % if a solution given by R's LQS method is given, provide a second start
-    %    model.StartNumber = 1;
-    %    model.start = [nan; NaN(5*m,1) ; lqs_beta]; 
-    %end
 else %MIO1
     model.StartNumber = 0;
     model.start = [nan; NaN(4*m,1);   beta1];  % from algorithm 3
 
-    %if lqs_beta ~= -10 % if a solution given by R's LQS method is given, provide a second start
-    %    model.StartNumber = 1;
-    %    model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
-    %end
+end
+
+if strcmp(formulation, "lqs-mio-bm"% if a solution given by R's LQS method is given
+    model.StartNumber = 1;
+    model.start = [nan; NaN(5*m,1) ; lqs_beta]; 
+end
+if strcmp(formulation, "lqs-mio1"
+    model.StartNumber = 1;
+    model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
 end
 
 model.modelsense = 'min';
@@ -167,7 +170,7 @@ disp("solving")
 result = gurobi(model, params);
 result.status
 if strcmp(result.status, 'OPTIMAL')
-    if strcmp(formulation, "mio-bm")
+    if strcmp(formulation, "mio-bm") or strcmp(formulation, "lqs-mio-bm")
         beta_star = result.x((1+5*m+1):(1+5*m+n),1);
         z = result.x(1+4*m+1:1+4*m+m,1)
     else % MIO1
@@ -177,7 +180,7 @@ if strcmp(result.status, 'OPTIMAL')
 else 
     if result.mipgap ~= Inf
         fprintf("Using incumbent solution\n")
-        if strcmp(formulation, "mio-bm")
+        if strcmp(formulation, "mio-bm") or strcmp(formulation, "lqs-mio-bm")
             beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
             z = result.pool(1).xn(1+4*m+1:1+4*m+m,1)
         else % MIO1
