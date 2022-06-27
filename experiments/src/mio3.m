@@ -42,14 +42,13 @@
 % - iteration: iteration number.  Used in the output filename.
 % - datafname: full path to data file.
 % - lqs_beta: initial solution generate using LQS in R; a warmstart 
-%   for MIO3
+%   for MIO3. 
 % - m_normal: the  number of non-outlier rows of data.
 % - resloc: path to folder where output file will reside.
 % - timelimit: time limit for MIP solver.
 % - errs: object to store errors after each phase. On input, contains
 %         maxDist; to count number of points within maxDist distance
-% - rbm_beta: input from RBM; a warmstart for MIO3
-% - formulation: "mio3" or "rbmmio3"
+% - formulation: "mio3" for alg3 warm start or "lqs-mio3" for LQS warmstart
 %
 % OUTPUTS:
 % - beta_star: the coefficients of the best-fit hyperplane after
@@ -63,7 +62,7 @@
 % - f_beta_star: gamma, the objective function value from the first 
 %                phase.  The absolute value of the q^th largest residual.
 
-function [beta_star, f_beta_star] = mio3(iteration, datafname,q, lqs_beta, m_normal, dep_var, formulation, resloc, timelimit, rbm_beta, errs)
+function [beta_star, f_beta_star] = mio3(iteration, datafname,q, lqs_beta, m_normal, dep_var, formulation, resloc, timelimit, errs)
     disp("running mio3")
 
     X = readtable(datafname);
@@ -104,23 +103,19 @@ function [beta_star, f_beta_star] = mio3(iteration, datafname,q, lqs_beta, m_nor
  
     % get algorithm 3 warm start
     tic;
-    if lqs_beta ~= -1 % only if an LQS warm start is provided
+    if formulation == "mio3" % only if an LQS warm start is provided
         disp("algorithm 3")
-        [beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA");
+        [beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA")
         disp("finished algorithm 3")
     end
     alg3_time = toc;
     %mio1
-    rbm_beta
     lqs_beta
-    if rbm_beta ~= -1
-        model.StartNumber = 0; % from RBM
-        model.start = [nan; NaN(4*m,1) ; rbm_beta]; % set RBM warm start
-    end
-    if lqs_beta ~= -1
+    if formulation == "mio3"
         model.StartNumber = 1; % from alg3
         model.start = [nan; NaN(4*m,1);   beta1];  % set alg3 warm start
-        model.StartNumber = 2; % from LQS
+    elseif formulation == "lqs-mio3"
+        model.StartNumber = 1; % from LQS
         model.start = [nan; NaN(4*m,1) ; lqs_beta]; % set LQS warm start
     end
 
@@ -186,7 +181,8 @@ if dep_var == true % get error along response direction; recall beta_1 = -1
     output.totSqErrAll1 = sum(dist(:,1).*dist(:,1),1);
     edist = dist;
     dist_sort = sort(dist(:,1).*dist(:,1));
-    mio3_lts1 = sum(dist_sort(1:m_normal)); 
+    mio3_tsestar1 = sum(dist_sort(1:m_normal)); 
+    mio3_tse1 = sum(dist_sort(1:q)); 
 else % get orthogonal error
     gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
     edist = abs(dist/gradLen);
@@ -194,10 +190,11 @@ else % get orthogonal error
     output.totSqErrAll1 = sum(edist(:,1).*edist(:,1));
     my_dist = edist(:,1).*edist(:,1); % squared orthogonal distances
     my_dist_sort = sort(my_dist(:,1)); % sorted squared distances
-    mio3_lts1 = sum(my_dist_sort(1:m_normal,1));
+    mio3_tsestar1 = sum(my_dist_sort(1:m_normal,1));
+    mio3_tse1 = sum(my_dist_sort(1:q,1));
 end
 
-if exist('errs') > 0 
+if exist('errs.maxDist') > 0 
    maxDist = errs.maxDist
    output.numCloseAll1 = sum(edist <= maxDist) % count number of points within maxDist (provided on input)
 end
@@ -230,12 +227,15 @@ beta_star = beta_star(:,1);
 % Calculate errors
 output.totSqErrTru2 = -1;
 dist = abs(X*beta_star);
+sortedabsdist = sort(dist); % for general, distance is unnormalized
+gamma2 = sortedabsdist(q,1)
 if dep_var == true % get error along response direction; beta_1 = -1
     output.totSqErrTru2 = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
     output.totSqErrAll2 = sum(dist(:,1).*dist(:,1));
     edist = dist;
     dist_sort = sort(dist(:,1).*dist(:,1));
-    mio3_lts2 = sum(dist_sort(1:m_normal,1)); 
+    mio3_tsestar2 = sum(dist_sort(1:m_normal,1)); 
+    mio3_tse2 = sum(dist_sort(1:q,1)); 
 else % get orthogonal error
     gradLen = norm(beta_star(2:n)); % first coefficient is the intercept; exclude that from the gradLen calculation
     edist = abs(dist/gradLen);
@@ -243,10 +243,11 @@ else % get orthogonal error
     output.totSqErrAll2 = sum(edist(:,1).*edist(:,1));
     my_dist = edist(:,1).*edist(:,1); % squared orthogonal distances
     my_dist_sort = sort(my_dist); % sorted squared distances
-    mio3_lts2 = sum(my_dist_sort(1:m_normal,1));
+    mio3_tsestar2 = sum(my_dist_sort(1:m_normal,1));
+    mio3_tse2 = sum(my_dist_sort(1:q,1));
 end
 
-if exist('errs') > 0 
+if exist('errs.maxDist') > 0 
     output.numCloseAll2 = sum(edist <= maxDist) % count number of points within maxDist
 end
 
@@ -279,12 +280,15 @@ beta_star = beta_star(:,1);
 % Calculate errors
 output.totSqErrTru3 = -1;
 dist = abs(X*beta_star);
+sortedabsdist = sort(dist); % for general, distance is unnormalized
+gamma3 = sortedabsdist(q,1)
 if dep_var == true % get error along response direction
     output.totSqErrTru3 = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
     output.totSqErrAll3 = sum(dist(:,1).*dist(:,1));
     edist = dist;
     dist_sort = sort(dist(:,1).*dist(:,1));
-    mio3_lts3 = sum(dist_sort(1:m_normal,1)); 
+    mio3_tsestar3 = sum(dist_sort(1:m_normal,1)); 
+    mio3_tse3 = sum(dist_sort(1:q,1)); 
 else % get orthogonal error
     gradLen = norm(beta_star(2:n)); % first coefficient is the intercept; exclude that from the gradLen calculation
     edist = abs(dist/gradLen);
@@ -292,10 +296,12 @@ else % get orthogonal error
     output.totSqErrAll3 = sum(edist(:,1).*edist(:,1));
     my_dist = edist(:,1).*edist(:,1); % squared orthogonal distances
     my_dist_sort = sort(my_dist); % sorted squared distances
-    mio3_lts3 = sum(my_dist_sort(1:m_normal,1));
+    mio3_tsestar3 = sum(my_dist_sort(1:m_normal,1));
+    mio3_tse3 = sum(my_dist_sort(1:q,1));
 end
 
-if exist('errs') > 0 
+
+if exist('errs.maxDist') > 0 
     output.numCloseAll3 = sum(edist <= maxDist) % count points within maxDist
 end
 
@@ -305,18 +311,20 @@ rq = edist(idx == q); % get qth distance
 out_fname = strcat(resloc, "/", formulation, "i", int2str(iteration), ".csv")
 disp(out_fname)
 out_file = fopen(out_fname, 'w');
-%output.totTime  = toc;
+output.totTime  = toc;
 
 
-% filename, total number of points, number of variables, number of non-outliers, percentile for LQS, formulation- mio3, 
-% total squared error to hyperplane (along response or orthogonal),  gurobi runtime, gamma, error for non-outliers after MIO, 
-% error for all points after MIO, error for non-outliers after PCA/OLS, error for all points after PCA/OLS, 
-% error for non-outliers after step 3, error for all points after step 3, algorithm 3 time
-if exist('errs') > 0 
-    fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%d,%d,%d,%f,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, output.totSqErrTru3, result.runtime, result.status, f_beta_star, result.objbound, output.totSqErrTru1, output.totSqErrAll1, output.totSqErrTru2, output.totSqErrAll2, output.totSqErrTru3, output.totSqErrAll3, num_outliers_in_q, alg3_time,errs.numCloseAll(1,3),output.numCloseAll1, output.numCloseAll2, output.numCloseAll3, errs.totSqDistTru(1,3),errs.lts,mio3_lts1,mio3_lts2,mio3_lts3);
-else
-    fprintf(out_file,"%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%d,%d,%d,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, output.totSqErrTru3, result.runtime, result.status, f_beta_star, result.objbound, output.totSqErrTru1, output.totSqErrAll1, output.totSqErrTru2, output.totSqErrAll2, output.totSqErrTru3, output.totSqErrAll3, num_outliers_in_q, alg3_time,errs.numCloseAll(1,3),output.numCloseAll1, output.numCloseAll2, output.numCloseAll3, errs.totSqDistTru(1,3),mio3_lts1,mio3_lts2,mio3_lts3);
-end
+% filename, iteration, total number of points, number of variables, number of non-outliers, percentile for LQS, formulation- mio3, 
+% total squared error to hyperplane (along response or orthogonal),  gurobi runtime, gurobi status, gamma, gurobi bound,
+% error for non-outliers after MIO,  error for all points after MIO, 
+% error for non-outliers after PCA/OLS, error for all points after PCA/OLS, 
+% error for non-outliers after step 3, error for all points after step 3, 
+% num outliers in q, algorithm 3 time
+% MIO1 TSE, MIO2 TSE, MIO3, TSE
+% MIO1 TSEstar, MIO2 TSEstar, MIO3, TSEstar
+
+
+fprintf(out_file,"%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, output.totSqErrTru3, result.runtime, result.status, f_beta_star, result.objbound, output.totSqErrTru1, output.totSqErrAll1, output.totSqErrTru2, output.totSqErrAll2, output.totSqErrTru3, output.totSqErrAll3, num_outliers_in_q, alg3_time,mio3_tse1,mio3_tse2,mio3_tse3,mio3_tsestar1,mio3_tsestar2,mio3_tsestar3,gamma2,gamma3,output.totTime);
 
 fclose(out_file);
 

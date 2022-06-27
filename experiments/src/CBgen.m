@@ -1,6 +1,8 @@
-% March 18, 2022
-% John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
-% J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
+% May 25, 2022
+% John W. Chinneck, Systems and Computer Engineering, 
+%   Carleton University, Ottawa, Canada
+% J. Paul Brooks, Dept. of Information Systems, 
+%   Virginia Commonwealth University, Richmond, Virginia, USA
 
 % This function fits a hyperplane to a set of data points in a way that
 % heuristically maximizes the number of points that are "close" to it. It
@@ -12,27 +14,31 @@
 % INPUTS:
 %   Aorig: the original data matrix (points x variables)
 %   inParam: input parameters:
-%     mgood: if > 0 this is the known number of nonoutlier points, which
+%     .mgood: if > 0 this is the known number of inlier points, which
 %            must be the first mgood points in the set. Knowing this allows
 %            the calculation of useful statistics for testing purposes. Of
-%            course mgood is not known in general.
-%     maxDist: points closer than this distance to a hyperplane are
+%            course mgood is not known in general. Must be specified.
+%     .maxDist: points closer than this distance to a hyperplane are
 %              "close". Distance is Euclidean.
 %              There are 3 cases:
 %              < 0: -maxDist is the percentile of distances from the first
-%                   hyperplane to used as maxDist. Note it is in %. 
-%                   maxDist = -16 is recommended.
-%              = 0: means that maxDist is not used to help identify the
-%                   best hyperplane.
-%              > 0: used as an actual Euclidean distance to define maxDist.
+%                   hyperplane. Note it is in %. 
+%                   NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
+%                   If maxDist is not specified, then -16 is used.
+%              = 0: means that closeAll is not used to help identify the
+%                   best hyperplane. Result is just the 3rd hyperplane.
+%              > 0: an actual Euclidean distance to define maxDist.
 % OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
+%     .status: -1: failure, 0: OK, 1: exact solution (usually because m=n)
 %     .maxDist: the final value of maxDist, points closer than maxDist to
 %       a hyperplane are counted as being "close" to it 
 %     .m[x]: the number of data points when finding the hyperplanes
-%    [NOTE: hyerplane equations have this form:
+%       [NOTE: hyperplane equations have this form:
 %       weight_1*x_1 + weight_2*x_2 + .... = RHS]
 %    .weights[x]: the weights in the hyperplane equations
 %    .RHS[x]: the right hand side values in the hyperplane equations
+%    .q: number of inliers estimated by the outFinder routine
+%    .qout: number of inliers estimated by final hyperplane
 %    .totSqDistAll[x]: total squared distance to all points
 %    .solTime: solution time in seconds.
 %    If maxDist ~= 0: 
@@ -41,26 +47,46 @@
 %        .closeTru[x]: number of mgood points "close" to the hyperplane
 %    if mgood > 0:
 %      .totSqDistTru[x]: total squared distances to the mgood points
-%      .SMSSE[x]: the "sum of mgood smallest squared errors" for the 
+%      .TSEstar[x]: the sum of mgood smallest squared errors for the 
 %        hyperplanes. This is the same as "trimmed squared error" for 
 %        mgood points. Note that it isn't necessarily the mgood non-outlier 
 %        points identified on input, just mgood points in total.
-%      .bnd2: this is a tight upper bound on the best possible SMSSE value,
+%      .bnd2: this is a tight upper bound on the best possible TSEstar value,
 %        calculated by fitting the PCA to only the mgood points and then
-%        calculating the SMSSE for those points. 
+%        calculating the TSEstar for those points. 
 
 function [inc] = CBgen(Aorig,inParam)
+inc.status = 0;
 
 fprintf("Input parameters:\n");
 fprintf("  mgood %d\n",inParam.mgood)
 fprintf("  maxDist %f\n",inParam.maxDist)
+maxDist = inParam.maxDist;
+% mgood is the number of inliers, if known (useful for testing purposes)
+if isfield(inParam,'mgood') == 1
+    mgood = inParam.mgood;
+else
+    mgood = 0;
+end
 
-mgood = inParam.mgood;
 tic;
 
 % Get data table dimensions
 m = size(Aorig,1);
 norig = size(Aorig,2);
+
+if m < norig
+    % Too few points: abort
+    fprintf("  Too few points: aborting. m = %d, n = %d.\n",m,norig)
+    inc.weightsOut = zeros(norig,1);
+    inc.RHSOut = 0;
+    inc.edistOut = zeros(m,1);
+    inc.bnd2 = 0;
+    inc.status = -1;
+    return
+end
+
+
 % Print some stats to console
 if mgood > 0
     fprintf("  Stats: mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
@@ -78,9 +104,20 @@ dist = Aorig*weights - RHS;
 gradLen = norm(weights);
 edist = abs(dist/gradLen);
 
+if max(edist) < 1.0e-6
+    % Exact fit, within tolerance
+    fprintf("  Exact fit. Max absolute Euclidean error: %f. Note m = %d and n = %d.\n",...
+        max(edist),m,norig)
+    inc.weightsOut = w;
+    inc.RHSOut = w0;
+    inc.edistOut = edist;
+    inc.bnd2 = 0;
+    inc.status = 1;
+    return
+end
+
 % Find maxDist automatically if not prespecified
-maxDist = inParam.maxDist;
-if inParam.maxDist < 0
+if maxDist < 0
     maxDist = prctile(edist,-maxDist);
     fprintf("  maxDist automatically selected as %f\n",maxDist)
 end
@@ -96,16 +133,19 @@ if maxDist ~= 0
 end
 inc.weights1 = weights;
 inc.RHS1 = RHS;
+inc.weightsOut = inc.weights1;
+inc.RHSOut = inc.RHS1;
+
 if mgood > 0
     inc.totSqDistTru1 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
     if maxDist ~= 0
         inc.closeTru1 = sum(edist(1:mgood,1) < maxDist);
     end
-    % Calculate SMSSE, the sum of the mgood smallest squared errors
+    % Calculate TSEstar, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
-    inc.SMSSE1 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
-    inc.SMSSEout = inc.SMSSE1;
-    fprintf("  SMSSE %f\n",inc.SMSSE1)
+    inc.TSEstar1 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
+    inc.TSEstarOut = inc.TSEstar1;
+    fprintf("  TSEstar %f\n",inc.TSEstar1)
     %Calculate bnd2
     [weights,RHS] = getPCAHP(Aorig(1:mgood,:));
     dist = Aorig*weights - RHS;
@@ -113,13 +153,14 @@ if mgood > 0
     gradLen = norm(weights);
     edist = abs(dist/gradLen);
     inc.bnd2 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
-    inc.SMSSEout = inc.SMSSE1;
+    fprintf("  bnd2: %f\n",inc.bnd2)
 end
 outStep = 1;
 
 % Analyze and remove outliers ---------------------------------------------
 % outFinder removes no more than mtot-n points, so that PCA can run
 [OM] = outFinder(Aorig,mgood);
+inc.q = OM.q;
 B = zeros(m,norig);
 icount = 0;
 for i=1:m
@@ -132,7 +173,7 @@ B = B(1:icount,:);
 inc.m2 = icount;
 fprintf("Outliers removed: %d points remain.\n",icount)
 
-% get the PCA solution
+% Get the PCA solution
 [weights,RHS] = getPCAHP(B);
 % Calculate the point distances from the hyperplane
 dist = Aorig*weights - RHS;
@@ -156,10 +197,10 @@ if mgood > 0
     if maxDist ~= 0
         inc.closeTru2 = sum(edist(1:mgood,1) < maxDist);
     end
-    % Calculate SMSSE, the sum of the mgood smallest squared errors
+    % Calculate TSEstar, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
-    inc.SMSSE2 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
-    fprintf("  SMSSE %f\n",inc.SMSSE2)
+    inc.TSEstar2 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
+    fprintf("  TSEstar %f\n",inc.TSEstar2)
 end
 
 % Update output solution if appropriate
@@ -171,14 +212,14 @@ if maxDist ~= 0
         inc.RHSOut = inc.RHS2;
         inc.totSqDistAllOut = inc.totSqDistAll2;
         if mgood > 0
-            inc.SMSSEout = inc.SMSSE2;
+            inc.TSEstarOut = inc.TSEstar2;
             inc.totSqDistTruOut = inc.totSqDistTru2;
             inc.closeTruOut = inc.closeTru2;
         end
     end
 end
 
-% reinstate any nonoutliers and find HP again -----------------------------
+% Reinstate any nonoutliers and find HP again -----------------------------
 % Too many points are sometimes removed for PCA to run, so guard against
 outliers = isoutlier(edist);
 if m - sum(outliers) < norig
@@ -201,7 +242,7 @@ B = B(1:mB,:);
 inc.m3 = mB;
 fprintf("Reinstatement phase: %d points\n",mB)
 
-% get the PCA solution
+% Get the PCA solution
 [weights,RHS] = getPCAHP(B);
 % Calculate the point distances from the hyperplane
 dist = Aorig*weights - RHS;
@@ -222,10 +263,10 @@ if mgood > 0
     if maxDist ~= 0
         inc.closeTru3 = sum(edist(1:mgood,1) < maxDist);
     end
-    % Calculate SMSSE, the sum of the mgood smallest squared errors
+    % Calculate TSEstar, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
-    inc.SMSSE3 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
-    fprintf("  SMSSE %f\n",inc.SMSSE3)
+    inc.TSEstar3 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
+    fprintf("  TSEstar %f\n",inc.TSEstar3)
 end
 
 % Update output solution if appropriate
@@ -237,7 +278,7 @@ if maxDist ~= 0
         inc.RHSOut = inc.RHS3;
         inc.totSqDistAllOut = inc.totSqDistAll3;
         if mgood > 0
-            inc.SMSSEout = inc.SMSSE3;
+            inc.TSEstarOut = inc.TSEstar3;
             inc.totSqDistTruOut = inc.totSqDistTru3;
             inc.closeTruOut = inc.closeTru3;
         end
@@ -247,10 +288,10 @@ end
 if maxDist == 0
     outStep = 3;
     inc.weightsOut = inc.weights3;
-    inc.RHSout = inc.RHS3;
+    inc.RHSOut = inc.RHS3;
     inc.totSqDistAllOut = inc.totSqDistAll3;
     if mgood > 0
-        inc.SMSSEout = inc.SMSSE3;
+        inc.TSEstarOut = inc.TSEstar3;
         inc.totSqDistTruOut = inc.totSqDistTru3;
     end
 end
@@ -262,8 +303,17 @@ if maxDist ~= 0
     fprintf("  %d close points\n",inc.closeAllOut)
 end
 if mgood > 0
-    fprintf("  SMSSE %f\n",inc.SMSSEout)
+    fprintf("  TSEstar %f\n",inc.TSEstarOut)
 end
+
+% Calculate the estimated number of inliers at output (inc.qout)
+% Calculate the point distances from the hyperplane
+dist = Aorig*inc.weightsOut - inc.RHSOut;
+% Calculate the Euclidean point distances from the hyperplane
+gradLen = norm(inc.weightsOut);
+edist = abs(dist/gradLen);
+outliers = isoutlier(edist);
+inc.qout = m - sum(outliers);
 
 return
 end
@@ -286,6 +336,7 @@ end
 %         axis, including the original variables and the PCA axes
 %   .TF: mx1 logical vector listing points identified as outliers
 %   .count: total number of points identified as outliers
+%   .q: the estimated number of inliers
 %   If mgood > 0 and mgood < m:
 %     .outTru: number of nonoutlier points identified as outliers
 %     .outTruFrac: fraction of nonoutlier points identified as outliers
@@ -335,10 +386,12 @@ else
     istart = ceil(m/2);
     cutoff = sortedMax(istart,1);
 end
+outMeasure.q = istart - 1;
  
 for i = istart:m
     if changes(i,1)
         cutoff = sortedMax(i,1);
+        outMeasure.q = i-1;
         break
     end
 end
@@ -354,4 +407,64 @@ if (mgood > 0) && (mgood < m)
 end
 
 return
+end
+%--------------------------------------------------------------------------
+% March 21, 2022
+% John W. Chinneck, Systems and Computer Engineering, 
+%   Carleton University, Ottawa, Canada
+% J. Paul Brooks, Dept. of Information Systems, 
+%   Virginia Commonwealth University, Richmond, Virginia, USA
+%
+% Get the best-fitting hyperplane from an input dataset, using PCA.
+% If there are insufficient points, default to an elastic linear
+% programming solution, which uses the MOSEK LP solver.
+%
+% INPUTS: dataSet is the data matrix
+% OUTPUTS: Hyperplane equation is: w*x = RHS.
+%   w: weights in the hyperplane equation
+%   RHS: right hand side constant in the hyperplane equation
+function [w,RHS] = getPCAHP(dataSet)
+
+n = size(dataSet,2);
+
+% pca doesn't work if the number of rows in the dataset is less than the
+% number of columns, so run an elastic LP solution instead
+if size(dataSet,1) < n
+    fprintf("  Too few observations vs. features for PCA: running elastic LP.\n")
+    m = size(dataSet,1);
+    % Set MOSEK parameters
+    param.MSK_IPAR_LOG = 0;
+    param.MSK_IPAR_OPF_WRITE_HEADER = 'MSK_OFF';
+    param.MSK_IPAR_WRITE_SOL_HEAD = 'MSK_OFF';
+    % Build the complete model constraint matrix and solve.
+    Alp = sparse([dataSet,speye(m,m),-speye(m,m)]);
+    blc = zeros(m,1) + n;
+    buc = zeros(m,1) + n;
+    nfinal = size(Alp,2);
+    blx = zeros(nfinal,1);
+    bux = zeros(nfinal,1) + Inf;
+    blx(1:n,1) = -Inf;
+    % set up original objective function
+    c = ones(nfinal,1);
+    c(1:n,1) = 0.0;
+    c(n+1:n+m,1) = ones(m,1);
+    c(n+m+1:n+2*m,1) = ones(m,1);
+    % Solve LP to find hyperplane
+    [res] = msklpopt(c,Alp,blc,buc,blx,bux,param,'minimize echo(0)');
+    w = res.sol.bas.xx(1:n,1);
+    RHS = n;
+    return
+end
+
+% column means
+my_means = mean(dataSet);
+% pca on centered data
+my_loadings = pca(dataSet,'Economy',false);
+% intercept of hyperplane
+RHS = sum(my_means*my_loadings(:,n));
+% norm vector of hyperplane
+w = my_loadings(:,n);
+% Hyperplane equation is: w*x = RHS.
+return
+
 end

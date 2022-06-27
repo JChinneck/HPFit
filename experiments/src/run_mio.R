@@ -92,7 +92,7 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   cat("\n", i, "\n")
   X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE) # read data
 
-  lqs_beta <- -1
+  lqs_beta <- -10
   if (calc_lqs_beta == TRUE) {
       if (dep_var == TRUE) { # response is first variable
           if (q==1.0) {
@@ -127,12 +127,21 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   add_path <- paste("addpath('", srcloc, "');", sep="") # add the path to the MATLAB files
   if (formulation == "mio3") { # three-phase approach
     if (dep_var == TRUE) { # first variable is response
-     cat("running mio3 ")
+      cat("running mio3 ")
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ",-1)", sep="")) # dep_var = TRUE
     } else { 
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit, ",-1)", sep="")) # dep_var = FALSE
     }
      
+  } else if (formulation == "cbmio3") {
+    if (dep_var == TRUE) { # first variable is response
+      cat("running cbmio3 ")
+      cat(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',", q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+      print(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+      run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+    } else {
+      run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+    }
   } else{ # MIO1 or MIO-BM
     if (dep_var == TRUE) { # first variable is response 
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE

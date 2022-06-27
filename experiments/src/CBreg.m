@@ -1,6 +1,8 @@
-% March 19, 2022
-% John W. Chinneck, Systems and Computer Engineering, Carleton University, Ottawa, Canada
-% J. Paul Brooks, Dept. of Information Systems, Virginia Commonwealth University, Richmond, Virginia, USA
+% May 25, 2022
+% John W. Chinneck, Systems and Computer Engineering, 
+%   Carleton University, Ottawa, Canada
+% J. Paul Brooks, Dept. of Information Systems, 
+%   Virginia Commonwealth University, Richmond, Virginia, USA
  
 % This function fits a regression hyperplane to a set of data points to
 % heuristically maximize the number of calculated points that are close to
@@ -15,21 +17,23 @@
 %   y: the output variable values
 %   Aorig: the original data matrix (points x predictor variables)
 %   inParam: input parameters:
-%     mgood: if > 0 this is the known number of nonoutlier points, which
+%     .mgood: if > 0 this is the known number of nonoutlier points, which
 %            must be the first mgood points in the y and Aorig. Knowing
 %            them allows the calculation of useful statistics for testing 
 %            purposes. Of course mgood is not known in general.
-%     maxResid: points having a residual error smaller than this are
+%            Must be specified on input.
+%     .maxResid: points having a residual error smaller than this are
 %              "close". 
 %              There are 3 cases:
 %              < 0: -maxResid is the percentile of residuals from the first
 %                   regression to be used as maxDist. Note it is in %. 
-%                   maxDist = -16 is recommended.
+%                   NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
 %              = 0: means that maxResid is not used to help identify the
 %                   best hyperplane to output.
 %              > 0: used as an actual residual value to define maxResid
 %                   which defines close points.
 % OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
+%     .status: -1: failure, 0: OK, 1: exact solution (usually because m=n)
 %     .maxResid: the final value of maxResid, points with residuals smaller
 %       than this are counted as "close"
 %     .m[x]: the number of data points when finding the three
@@ -38,6 +42,8 @@
 %       w0 + w1x1 + w2x2 + ... + wnxn = y,]
 %    .w0[x]: the constants in the hyperplane equations
 %    .weights[x]: the weights in the hyperplane equations
+%    .q: number of inliers estimated by the outFinder routine
+%    .qout: number of inliers estimated by final hyperplane
 %    .totSqResidAll[x]: total squared residual over all points
 %    .solTime: solution time in seconds.
 %    If maxDist ~= 0: 
@@ -46,27 +52,52 @@
 %        .numCloseTru[x]: number of good points that have "close" residuals
 %    If mgood > 0:
 %      .totSqResidTru[x]: total squared residuals over the mgood points
-%      .SMSRE[x]: the "sum of mgood smallest squared residual errors" for 
+%      .TSEstar[x]: the "sum of mgood smallest squared residual errors" for 
 %        the hyperplanes. Note that isn't necessarily over the mgood 
 %        pre-specified non-outlier points, just over mgood points in total.
-%      .bnd2: this is a tight upper bound on the best possible SMSRE value,
+%      .bnd2: this is a tight upper bound on the best possible TSEstar value,
 %        calculated by fitting to only the mgood points and then
-%        calculating the SMSRE for those points. 
+%        calculating the TSEstar for those points. 
 %      .RMSETru[x]: root mean square residual for the mgood points
 %      .MSETru[x]: mean squared residual for the mgood points
 %      .MAETru[x]: mean absolute residual for the mgood points
 
 function [inc] = CBreg(y,Aorig,inParam)
+inc.status = 0;
 
+if isfield(inParam,'mgood') == 1
+    mgood = inParam.mgood;
+else
+    mgood = 0;
+end
+if isfield(inParam,'maxResid') == 1
+    maxResid = inParam.maxResid;
+else
+    % default to the recommended value
+    maxResid = -16;
+end
 fprintf("Input parameters:\n")
-fprintf("  mgood %d\n",inParam.mgood)
-fprintf("  maxResid %f\n",inParam.maxResid)
-mgood = inParam.mgood;
+fprintf("  maxResid %f\n",maxResid)
+fprintf("  mgood %d\n",mgood)
+
 tic;
 
 % Get data table dimensions
 m = size(Aorig,1);
 norig = size(Aorig,2);
+
+if m < norig
+    % Too few points: abort
+    fprintf("  Too few points: aborting. m = %d, n = %d.\n",m,norig)
+    inc.weightsOut = zeros(norig,1);
+    inc.w0Out = 0;
+    inc.residOut = zeros(m,1);
+    inc.maxResid = 0;
+    inc.bnd2 = 0;
+    inc.status = -1;
+    return
+end
+
 if mgood > 0
     fprintf("  Stats: mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
 else
@@ -77,7 +108,7 @@ end
 % so a column of ones is added at the beginning of Aorig
 A = [ones(m,1),Aorig];
 
-% initial regression solution for the original dataset --------------------
+% Initial regression solution for the original dataset --------------------
 
 fprintf("Initial regression on all %d points.\n",m)
 inc.m1 = m;
@@ -87,7 +118,19 @@ w = beta(2:norig+1,1);
 resid = w0 + Aorig*w - y;
 absresid = abs(resid);
 
-maxResid = inParam.maxResid;
+if max(absresid) < 1.0e-6
+    % Exact fit, within tolerance
+    fprintf("  Exact fit. Max absolute residual: %f. Note m = %d and n = %d.\n",...
+        max(absresid),m,norig)
+    inc.weightsOut = w;
+    inc.w0Out = w0;
+    inc.residOut = resid;
+    inc.maxResid = 0;
+    inc.bnd2 = 0;
+    inc.status = 1;
+    return
+end
+
 if maxResid < 0
     maxResid = prctile(absresid,-maxResid);
     fprintf("  maxResid automatically selected as %f\n",maxResid)
@@ -110,14 +153,13 @@ if mgood > 0
     residbnd = w0bnd + Aorig*wbnd - y;
     inc.bnd2 = norm(residbnd(1:mgood,1).*residbnd(1:mgood,1),1);
     fprintf("  bnd2: %f\n",inc.bnd2)
-    % Calculate SMSRE
+    % Calculate TSEstar
     sortedabsResid = sort(absresid);
-    inc.SMSRE1 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
-    inc.SMSREOut = inc.SMSRE1;
-    fprintf("  SMSRE %f. \n",inc.SMSRE1)
+    inc.TSEstar1 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
+    inc.TSEstarOut = inc.TSEstar1;
+    fprintf("  TSEstar %f. \n",inc.TSEstar1)
 end
 inc.totSqResidAll1 = norm(absresid(:,1).*absresid(:,1),1);
-inc.totSqResidAllOut = inc.totSqResidAll1;
 inc.weights1 = w;
 inc.w01 = w0;
 if maxResid > 0
@@ -125,11 +167,18 @@ if maxResid > 0
     inc.numCloseAllOut = inc.numCloseAll1;
     fprintf("  %d close points\n",inc.numCloseAll1)
 end
+
+% Initialize the output values
 outStep = 1;
+inc.weightsOut = inc.weights1;
+inc.w0Out = inc.w01;
+inc.residOut = inc.resid1;
+inc.totSqResidAllOut = inc.totSqResidAll1;
 
 % Analyze and remove outliers ---------------------------------------------
 
 [OM] = outFinder([Aorig,y],mgood);
+inc.q = OM.q;
 B = zeros(m,norig);
 y1 = zeros(m,1);
 icount = 0;
@@ -168,10 +217,10 @@ if mgood > 0
     if maxResid > 0
         inc.numCloseTru2 = sum(absresid(1:mgood,1) <= maxResid);
     end
-    % Calculate SMSRE
+    % Calculate TSEstar
     sortedabsResid = sort(absresid);
-    inc.SMSRE2 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
-    fprintf("  SMSRE %f.\n",inc.SMSRE2)
+    inc.TSEstar2 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
+    fprintf("  TSEstar %f.\n",inc.TSEstar2)
 end
 inc.totSqResidAll2 = norm(absresid(:,1).*absresid(:,1),1);
 if maxResid > 0
@@ -181,7 +230,7 @@ end
 inc.weights2 = w;
 inc.w02 = w0;
 
-%Update output solution if appropriate
+% Update output solution if appropriate
 if maxResid ~= 0
     if inc.numCloseAll2 >= inc.numCloseAll1
         outStep = 2;
@@ -196,12 +245,12 @@ if maxResid ~= 0
             inc.RMSETruOut = inc.RMSETru2;
             inc.MSETruOut = inc.MSETru2;
             inc.MAETruOut = inc.MAETru2;
-            inc.SMSREOut = inc.SMSRE2;
+            inc.TSEstarOut = inc.TSEstar2;
         end
     end
 end
 
-% Reinstate any nonoutliers and find HP again -----------------------------
+% Reinstate any nonoutliers and regress again -----------------------------
 
 outliers = isoutlier(absresid);
 % Make sure there are at least norig points left for the final fit
@@ -245,10 +294,10 @@ if mgood > 0
     if maxResid > 0
         inc.numCloseTru3 = sum(absresid(1:mgood,1) <= maxResid);
     end
-    % Calculate SMSRE
+    % Calculate TSEstar
     sortedabsResid = sort(absresid);
-    inc.SMSRE3 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
-    fprintf("  SMSRE %f.\n",inc.SMSRE3)
+    inc.TSEstar3 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
+    fprintf("  TSEstar %f.\n",inc.TSEstar3)
 end
 inc.totSqResidAll3 = norm(absresid(:,1).*absresid(:,1),1);
 if maxResid > 0
@@ -270,8 +319,8 @@ if maxResid == 0
        inc.RMSETruOut = inc.RMSETru3;
        inc.MSETruOut = inc.MSETru3;
        inc.MAETruOut = inc.MAETru3;
-       inc.SMSREOut = inc.SMSRE3;
-       fprintf("  SMSRE %f.\n",inc.SMSREOut)
+       inc.TSEstarOut = inc.TSEstar3;
+       fprintf("  TSEstar %f.\n",inc.TSEstarOut)
    end
 end
 
@@ -290,8 +339,8 @@ if maxResid ~= 0
             inc.RMSETruOut = inc.RMSETru3;
             inc.MSETruOut = inc.MSETru3;
             inc.MAETruOut = inc.MAETru3;
-            inc.SMSREOut = inc.SMSRE3;
-            fprintf("  SMSRE %f.\n",inc.SMSREOut)
+            inc.TSEstarOut = inc.TSEstar3;
+            fprintf("  TSEstar %f.\n",inc.TSEstarOut)
         end
         if maxResid ~= 0
             fprintf("  %d close points\n",inc.numCloseAllOut)
@@ -303,11 +352,15 @@ inc.solTime = toc;
 
 fprintf("Output solution from Step %d\n",outStep)
 if mgood > 0
-    fprintf("  SMSRE %f\n",inc.SMSREOut);
+    fprintf("  TSEstar %f\n",inc.TSEstarOut);
 end
 if maxResid ~= 0
     fprintf("  %d close points\n",inc.numCloseAllOut);
 end
+
+% Calculate the estimated number of inliers at output (inc.qout)
+outliers = isoutlier(abs(inc.residOut));
+inc.qout = m - sum(outliers);
 
 return
 end
@@ -331,6 +384,7 @@ end
 %         axis, including the original variables and the PCA axes
 %   .TF: mx1 logical vector listing points identified as outliers
 %   .count: total number of points identified as outliers
+%   .q: the estimated number of inliers
 %   If mgood > 0 and mgood < m:
 %     .outTru: number of nonoutlier points identified as outliers
 %     .outTruFrac: fraction of nonoutlier points identified as outliers
@@ -340,7 +394,7 @@ function [outMeasure] = outFinder(A,mgood)
 m = size(A,1);
 n = size(A,2);
 outMeasure.max = zeros(m,1) - Inf;
- 
+
 % Axis-aligned hyperplanes
 for j=1:n
     absDiffs = abs(A(:,j) - median(A(:,j)));
@@ -352,10 +406,10 @@ for j=1:n
         end
     end
 end
- 
+
 % principal component axes
 [~,score,~] = pca(A);
-for j=1:n
+for j=1:size(score,2)
     absDiffs = abs(score(:,j) - median(score(:,j)));
     % Offset in case of zero median
     fracDiffs = absDiffs/(median(absDiffs)+1);
@@ -365,7 +419,7 @@ for j=1:n
         end
     end
 end
- 
+
 % Use the first abrupt change value in sorted outMeasure.max after the 
 % starting point to identify outliers
 sortedMax = sort(outMeasure.max);
@@ -380,16 +434,18 @@ else
     istart = ceil(m/2);
     cutoff = sortedMax(istart,1);
 end
+outMeasure.q = istart - 1;
  
 for i = istart:m
     if changes(i,1)
         cutoff = sortedMax(i,1);
+        outMeasure.q = i-1;
         break
     end
 end
 outMeasure.TF = outMeasure.max >= cutoff;
 outMeasure.count = sum(outMeasure.TF);
- 
+
 % if mgood is nonzero, then calculate some accuracy measures
 if (mgood > 0) && (mgood < m) 
     outMeasure.outTru = sum(outMeasure.TF(1:mgood,1));
@@ -397,6 +453,6 @@ if (mgood > 0) && (mgood < m)
     outMeasure.outOut = sum(outMeasure.TF(mgood+1:m,1));
     outMeasure.outOutFrac = outMeasure.outOut/(m-mgood);
 end
- 
+
 return
 end

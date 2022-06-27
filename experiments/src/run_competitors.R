@@ -20,8 +20,6 @@
 #         are chosen to ensure high breakdown
 #  - lts: least trimmed squares regression 
 #  - lqs: least quartile of squares regression
-#  - rbm: relative better method of JWC
-#  - rbmmio3: RBM plus revised MIO formulation
 #  - alg3: Algorithm 3 from Bertsimas and Mazumder (2014), designed 
 #           as a warmup to MIO
 #
@@ -505,7 +503,7 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
           lqs_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "lqs", lqs_dist, lqs_rq, lqs_time[1], lqs_time[2], lqs_time[3], lqs_lts, sep=",")
           write(lqs_out, file=paste(resloc, "/lqsi", i, ".csv", sep=""))
       } else {
-          lqs_beta <- -1
+          lqs_beta <- -10
       }
   }
   print("lqs_beta")
@@ -521,13 +519,11 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
   # need to run RBM and get RBM start
   # run rbm when dep_var is FALSE
   if (dep_var == TRUE) {
-    run_matlab_code(paste(add_path, " ", "rbm(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "')", sep=""))
-    run_matlab_code(paste(add_path, " ", make_lqs_beta, " ",  "rbmmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "',", timelimit, ",lqs_beta)", sep=""))
+    run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", "cbmio3", "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
     run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "','PCA')", sep=""))
   } else {
     print(add_path)
-    run_matlab_code(paste(add_path, " ", "rbm(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "')", sep=""))
-    run_matlab_code(paste(add_path, " ", make_lqs_beta, " ",  "rbmmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "',", timelimit, ",lqs_beta)", sep=""))
+    run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", "cbmio3", "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
     if (n <= 500) {
       run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "','PCA')", sep=""))
     }
@@ -656,7 +652,7 @@ no_hbreg <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mose
           lqs_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "lqs", lqs_dist, lqs_rq, lqs_time[1], lqs_time[2], lqs_time[3], lqs_lts, sep=",")
           write(lqs_out, file=paste(resloc, "/lqsi", i, ".csv", sep=""))
       } else {
-          lqs_beta <- -1
+          lqs_beta <- -10
       }
   }
   print("lqs_beta")
