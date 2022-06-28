@@ -1,4 +1,4 @@
-% May 26, 2022
+% June 28, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -213,7 +213,7 @@ result = gurobi(model, gbparams);
 fprintf("  MIO solution status: %s\n",result.status)
 if strcmp(result.status, 'OPTIMAL')
     mioOut.w = result.x(1:n,1);
-    mioOut.RHS = n;
+    mioOut.RHS = inc.RHSOut;
 %     eplus = result.x(n+1:n+m,1);
 %     eminus = result.x(n+m+1:n+2*m,1);
 %     rel = result.x(n+2*m+1:n+3*m,1);
@@ -225,7 +225,7 @@ else
         % incumbent solution, so use that
         fprintf("  Using incumbent solution\n")
         mioOut.w = result.pool(1).xn(1:n,1);
-        mioOut.RHS = n;
+        mioOut.RHS = inc.RHSOut;
 %         eplus = result.pool(1).xn(n+1:n+m,1);
 %         eminus = result.pool(1).xn(n+m+1:n+2*m,1);
 %         rel = result.pool(1).xn(n+2*m+1:n+3*m,1);
