@@ -1,4 +1,4 @@
-% May 26, 2022
+% June 29, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -41,11 +41,15 @@
 %    Sample values:
 %      .TimeLimit = 3600;
 %      .OutputFlag = 1;
+%    Sometimes preferable to use a smaller value of .IntFeasTol to make sure
+%      that integer variables are closer to integer values.
 % OUTPUTS:
 %  result: the Gurobi result struct
 %  output: the fitted hyperplane output struct, with these fields:
 %    .w: the weights for the fitted hyperplane
 %    .gamma(k,1): the minimum value of the residual at the qth percentile
+%    .MIOgamma: value of gamma returned by MIO step. Often a little
+%        different than .gamma(2,1) due to MIO tolerances
 %    .TSEstar(k,1): if mtru > 0, the sum of the squared residuals
 %       for the mtru smallest residuals, for each of the steps, plus output:
 %         k=1: CBgen result, if used
@@ -60,10 +64,13 @@
 %      .bnd2: sum of squared residuals to a regression hyperplane fit to the
 %        mtru input points
 %
-% DEPENDENCIES: this routine calls CBreg, and the external solver Gurobi.
-%  Gurobi has a free academic license.
+% DEPENDENCIES: this routine calls:
+%   External solver Gurobi (free academic license).
+%   CBreg (available on this Github site).
+%   CBreg calls external solver MOSEK under certain conditions
+%      (free academic license).
 
-function [result,output] = CBMIOreg(y,Ain,mioparams,gbparams)
+function [result,output] = CBMIOregV2(y,Ain,mioparams,gbparams)
 
 mtru = mioparams.mtru;
 
@@ -218,6 +225,7 @@ if strcmp(result.status, 'OPTIMAL')
 %     rel = result.x(n+2*m+1:n+3*m,1);
     z = result.x(n+3*m+1:n+4*m,1);
     mioOut.gamma = result.x(n+4*m+1,1);
+    output.MIOgamma = mioOut.gamma;
 else
     if result.mipgap ~= Inf
         % Gurobi stopped for some reason, maybe time limit, but it has an
@@ -230,6 +238,7 @@ else
 %         rel = result.pool(1).xn(n+2*m+1:n+3*m,1);
         z = result.pool(1).xn(n+3*m+1:n+4*m,1);
         mioOut.gamma = result.pool(1).xn(n+4*m+1,1);
+        output.MIOgamma = mioOut.gamma;
     else
         fprintf("  No MIO solution available: aborting.\n")
         result.status = strcat(result.status,'_and_MIO_failure');
