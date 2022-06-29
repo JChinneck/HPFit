@@ -1,4 +1,4 @@
-% May 26, 2022
+% June 28, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -83,13 +83,15 @@ n = size(Ain,2);
 
 % set an integer value of q
 q = mioparams.q;
-if q > 0
-    % input q is a percentile
-    q = floor(q/100*m);
-else
-    if q < 0
-        % input q is a specific integer value
-        q = -q;
+if isa(q, 'double')
+    if q > 0
+        % input q is a percentile
+        q = floor(q/100*m);
+    else
+        if q < 0
+            % input q is a specific integer value
+            q = -q;
+        end
     end
 end
 
@@ -106,12 +108,22 @@ output.maxDist = maxDist;
 output.bnd2 = inc.bnd2;
 fprintf("  CBgen sets maxDist at %f\n",maxDist)
 
-if q == 0
-    % Set q based on outFinder results, found in CBgen ouput
-    q = inc.q;
+if isa(q, 'double')
+    if q == 0
+        % Set q based on outFinder results, found in CBgen ouput
+        q = inc.q;
+    end
+end
+if isa(q, 'char')
+    if q == "qout"
+        q = inc.qout;
+    end
 end
 output.q = q;
 fprintf("  q set at %d\n",q)
+
+output.cbq = inc.q;
+output.outfinderq = inc.qout;
 
 [output] = update(1,Ain,inc.weightsOut,inc.RHSOut,q,maxDist,mtru,output);
 output.CBgenTime = toc(tStart);
@@ -213,7 +225,7 @@ result = gurobi(model, gbparams);
 fprintf("  MIO solution status: %s\n",result.status)
 if strcmp(result.status, 'OPTIMAL')
     mioOut.w = result.x(1:n,1);
-    mioOut.RHS = n;
+    mioOut.RHS = inc.RHSOut;
 %     eplus = result.x(n+1:n+m,1);
 %     eminus = result.x(n+m+1:n+2*m,1);
 %     rel = result.x(n+2*m+1:n+3*m,1);
@@ -225,7 +237,7 @@ else
         % incumbent solution, so use that
         fprintf("  Using incumbent solution\n")
         mioOut.w = result.pool(1).xn(1:n,1);
-        mioOut.RHS = n;
+        mioOut.RHS = inc.RHSOut;
 %         eplus = result.pool(1).xn(n+1:n+m,1);
 %         eminus = result.pool(1).xn(n+m+1:n+2*m,1);
 %         rel = result.pool(1).xn(n+2*m+1:n+3*m,1);

@@ -19,6 +19,9 @@
 # q: 
 #   - the percentile used to evaluate the fit of a hyperplane in
 #     in the MIO1 and MIO-BM and phase 1 MIO3 formulations
+#   - for CB-MIO3, q = 0 will use the outFinder q
+#   - for CB-MIO3, q = "qout" will use the number of outliers on CB 
+#     exit
 # formulation:
 #   - mio-bm: use the model proposed by Bertsimas and Mazumder (2014)
 #   - mio1: use JWC's compact MIO model.
@@ -83,7 +86,7 @@ fit_lqs <- function(j, X, m, n, q) {
 }
 
   
-run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, resloc, calc_lqs_beta) {
+run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, resloc, calc_lqs_beta, mosekloc) {
   my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname) # get m, n, i from the dataset name
   my_regmatch <- regmatches(fname, my_regexec)
   m <- as.numeric(my_regmatch[[1]][2])
@@ -96,7 +99,7 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   if (calc_lqs_beta == TRUE) {
       if (dep_var == TRUE) { # response is first variable
           if (q==1.0) {
-            q=nrow(X)-1
+            q<-nrow(X)-1
           }
           my_lqs <- lqs(V1 ~ ., data=X, method="lqs", quantile=floor(q*nrow(X))) # fit LQS model for response; the first variable
           lqs_norm <- my_lqs$coefficients[2:length(my_lqs$coefficients)] # get coefficients but not intercept
@@ -122,10 +125,13 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
       }
   }
 
-  q <- floor(q*nrow(X)) # Convert q from percentile to order statistic for MATLAB implementations
+  if (class(q) == "numeric") {
+    q <- floor(q*nrow(X)) # Convert q from percentile to order statistic for MATLAB implementations
+  }
   make_lqs_beta <- rmat_to_matlab_mat(lqs_beta, matname="lqs_beta") # create the warm start from LQS
-  add_path <- paste("addpath('", srcloc, "');", sep="") # add the path to the MATLAB files
-  if (formulation == "mio3") { # three-phase approach
+  #add_path <- paste("addpath('", srcloc, "');", sep="") 
+  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="") # add the path to the MATLAB files and MOSEK
+  if (formulation == "mio3" | formulation == "lqs-mio3" | formulation == "alg3-mio3") { # three-phase approach
     if (dep_var == TRUE) { # first variable is response
       cat("running mio3 ")
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ",-1)", sep="")) # dep_var = TRUE
@@ -138,12 +144,21 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
       cat("running cbmio3 ")
       cat(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',", q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
       print(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
-      run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+      if (class(q) == "numeric") {
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+      } else {
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',",m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+      }
     } else {
-      run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+      if (class(q) == "numeric") {
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+      } else {
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+      }
     }
   } else{ # MIO1 or MIO-BM
     if (dep_var == TRUE) { # first variable is response 
+      print(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) 
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
     } else {
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE

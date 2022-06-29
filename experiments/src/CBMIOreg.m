@@ -36,7 +36,7 @@
 %               If maxResid is not specified, then -16 is used.
 %         = 0: means that closeAll is not used to help identify the
 %              best hyperplane. Result is just the final hyperplane.
-%         > 0: an actual residual to define maxDist. 
+%         > 0: an actual residual to define maxResid. 
 %  gbparams: struct containing all of the Gurobi control parameters
 %    Sample values:
 %      .TimeLimit = 3600;
@@ -84,13 +84,15 @@ n = size(A,2);
 
 % set an integer value of q
 q = mioparams.q;
-if q > 0
-    % input q is a percentile
-    q = floor(q/100*m);
-else
-    if q < 0
-        % input q is a specific integer value
-        q = -q;
+if isa(q, 'double') 
+    if q > 0
+        % input q is a percentile
+        q = floor(q/100*m);
+    else
+        if q < 0
+            % input q is a specific integer value
+            q = -q;
+        end
     end
 end
 
@@ -107,10 +109,20 @@ output.maxResid = maxResid;
 output.bnd2 = inc.bnd2;
 fprintf("  CBreg sets maxResid at %f\n",maxResid)
 
-if q == 0
-    % Set q based on outFinder results, found in CBreg ouput
-    q = inc.q;
+if isa(q, 'double') 
+    if q == 0
+        % Set q based on outFinder results, found in CBreg ouput
+        q = inc.q;
+    end
 end
+if isa(q, 'char')
+    if q == "qout"
+        q = inc.qout;
+    end
+end
+
+output.cbq = inc.q;
+output.outfinderq = inc.qout;
 
 output.q = q;
 fprintf("  q set at %d\n",q)

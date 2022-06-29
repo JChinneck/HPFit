@@ -59,6 +59,7 @@ if dep_var == true
     y = X(:,1); % first column is response
     A = X(:,2:n);
     [result, output] = CBMIOreg(y, A, mioparams, gbparams)
+    q = output.q; 
 % filename, iteration, total number of points, number of variables, number of non-outliers, percentile for LQS, formulation- cbmio3, 
 % gurobi runtime, gurobi status, CB gamma, objbound
 % TSEstar after CB, TSE after CB, gamma after CB
@@ -67,10 +68,11 @@ if dep_var == true
 % TSEstar after PCA on MIO, TSE after PCA on MIO, gamma after PCA on MIO
 % TSEstar after final PCA, TSE after final PCA, gamma after final PCA
 % MIO time,  CB time, total time
-    fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%d,%d,%d,%f,%f,%f\n", datafname, iteration, m, n, m_normal, q, formulation, result.runtime, result.status, output.gamma(4,1), result.objbound, output.TSEstar(1,1), output.TSE(1,1), output.gamma(1,1), output.TSEstar(2,1), output.TSE(2,1), output.gamma(2,1), output.TSEstar(3,1), output.TSE(3,1), output.gamma(3,1), output.TSEstar(4,1), output.TSE(4,1), output.gamma(4,1),output.closeAll(1,1),output.closeAll(2,1),output.closeAll(3,1),output.closeAll(4,1),output.MIOTime, output.CBregTime, output.solTime ); 
+    fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%d,%d,%d,%f,%f,%f,%d,%d\n", datafname, iteration, m, n, m_normal, q, formulation, result.runtime, result.status, output.gamma(4,1), result.objbound, output.TSEstar(1,1), output.TSE(1,1), output.gamma(1,1), output.TSEstar(2,1), output.TSE(2,1), output.gamma(2,1), output.TSEstar(3,1), output.TSE(3,1), output.gamma(3,1), output.TSEstar(4,1), output.TSE(4,1), output.gamma(4,1),output.closeAll(1,1),output.closeAll(2,1),output.closeAll(3,1),output.closeAll(4,1),output.MIOTime, output.CBregTime, output.solTime,output.cbq,output.outfinderq); 
 else 
     [result, output] = CBMIOgen(X, mioparams, gbparams)
-    fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%d,%d,%d,%f,%f,%f\n", datafname, iteration, m, n, m_normal, q, formulation, result.runtime, result.status, output.gamma(4,1), result.objbound, output.TSEstar(1,1), output.TSE(1,1), output.gamma(1,1), output.TSEstar(2,1), output.TSE(2,1), output.gamma(2,1), output.TSEstar(3,1), output.TSE(3,1), output.gamma(3,1), output.TSEstar(4,1), output.TSE(4,1), output.gamma(4,1),output.closeAll(1,1),output.closeAll(2,1),output.closeAll(3,1),output.closeAll(4,1),output.MIOTime, output.CBgenTime, output.solTime ); 
+    q = output.q;
+    fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%d,%d,%d,%f,%f,%f,%d,%d\n", datafname, iteration, m, n, m_normal, q, formulation, result.runtime, result.status, output.gamma(4,1), result.objbound, output.TSEstar(1,1), output.TSE(1,1), output.gamma(1,1), output.TSEstar(2,1), output.TSE(2,1), output.gamma(2,1), output.TSEstar(3,1), output.TSE(3,1), output.gamma(3,1), output.TSEstar(4,1), output.TSE(4,1), output.gamma(4,1),output.closeAll(1,1),output.closeAll(2,1),output.closeAll(3,1),output.closeAll(4,1),output.MIOTime, output.CBgenTime, output.solTime, output.cbq,output.outfinderq ); 
 end
 
 
