@@ -1,4 +1,4 @@
-% June 28, 2022
+% June 29, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -39,13 +39,18 @@
 %  gbparams: struct containing all of the Gurobi control parameters
 %    Sample values:
 %      .TimeLimit = 3600;
-%      .OutputFlag = 1;
+%      .OutputFlag = 0;
+%    Sometimes preferable to use a smaller value of .IntFeasTol to make sure
+%      that integer variables are closer to integer values.
 % OUTPUTS:
 %  result: the Gurobi result struct
 %  output: the fitted hyperplane output struct, with these fields:
 %    .w: the weights for the fitted hyperplane
 %    .RHS: value of constant in the hyperplane expression
 %    .gamma(k,1): the minimum value of the Euclidean error at the qth percentile
+%    .MIOgamma: value of gamma returned by MIO step. Often a little
+%        different than .gamma(2,1) due to MIO tolerances and Euclidean
+%        conversion
 %    .TSEstar(k,1): if mtru > 0, the sum of the squared Euclidean distances
 %       for the mtru points closest to the fitted hyperplane, for each of 
 %       the steps, plus output:
@@ -61,10 +66,13 @@
 %      .bnd2: sum of squared Euclidean distances to a hyperplane fit to the
 %        mtru input points
 %
-% DEPENDENCIES: this routine calls CBgen, and the external solver Gurobi.
-%    Gurobi has a free academic license.
+% DEPENDENCIES: this routine calls:
+%   External solver Gurobi (free academic license).
+%   CBgen (available on this Github site).
+%   CBgen calls external solver MOSEK under certain conditions
+%      (free academic license).
 
-function [result,output] = CBMIOgen(Ain,mioparams,gbparams)
+function [result,output] = CBMIOgenV2(Ain,mioparams,gbparams)
 
 mtru = mioparams.mtru;
 
@@ -110,6 +118,7 @@ if q == 0
     % Set q based on outFinder results, found in CBgen ouput
     q = inc.q;
 end
+
 output.q = q;
 fprintf("  q set at %d\n",q)
 
@@ -139,7 +148,7 @@ tMIOstart = tic;
 % col order: n w, m eplus, m eminus, m rel, m z, 1 gamma
 model.A = sparse(2*m+1,n+4*m+1);
 model.rhs = zeros(2*m+1,1);
-% m elastic cons, of form w1x1 + w2x2 + ... +wnxn + eplus - eminus = n. 
+% m elastic cons, of form w1x1 + w2x2 + ... +wnxn + eplus - eminus = RHS. 
 % Note use of the RHS output by CBgen
 output.w = zeros(n,1);
 output.RHS = inc.RHSOut;
@@ -219,6 +228,7 @@ if strcmp(result.status, 'OPTIMAL')
 %     rel = result.x(n+2*m+1:n+3*m,1);
     z = result.x(n+3*m+1:n+4*m,1);
     mioOut.gamma = result.x(n+4*m+1,1);
+    output.MIOgamma = mioOut.gamma;
 else
     if result.mipgap ~= Inf
         % Gurobi stopped for some reason, maybe time limit, but it has an
@@ -231,6 +241,7 @@ else
 %         rel = result.pool(1).xn(n+2*m+1:n+3*m,1);
         z = result.pool(1).xn(n+3*m+1:n+4*m,1);
         mioOut.gamma = result.pool(1).xn(n+4*m+1,1);
+        output.MIOgamma = mioOut.gamma;
     else
         fprintf("  No MIO solution available: aborting.\n")
         result.status = strcat(result.status,'_and_MIO_failure');
