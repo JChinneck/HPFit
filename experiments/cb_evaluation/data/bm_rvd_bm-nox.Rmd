@@ -1,0 +1,163 @@
+---
+title: "Bertsimas and Mazumder"
+output: html_document
+---
+Generate example with no outliers and smaller standard deviation on data and errors.
+```{r}
+gen_sample_test <- function(m,n,i) {
+  X <- matrix(rnorm(m*(n-1), sd=1),
+              ncol=n-1)
+  eps <- rnorm(m, sd=0.1)
+  beta <- rep(1, n-1)
+  y <- X %*% beta + eps - 1.0
+  my_data <- data.frame(y, X)
+  write.table(my_data, file=paste("rvd/m",
+                                m-length(outliers),
+                                "n",n, 
+                                "m_outliers", length(outliers), 
+                                "i", i, 
+                                ".csv",
+                                sep=""),
+            quote=FALSE,
+            row.names=FALSE,
+            col.names=FALSE,
+            sep=","
+  )
+}
+```
+
+
+
+Based on Rousseeuw and Driessen (2006).
+```{r}
+gen_sample_rvd <- function(m,n,my_pi,i) {
+  X <- matrix(rnorm(m*(n-1), sd=10),
+              ncol=n-1)
+  eps <- rnorm(m, sd=1)
+  beta <- rep(1, n-1)
+  y <- X %*% beta + eps - 1.0
+  outliers <- sample(1:m, size=floor(my_pi*m))
+  X[outliers,1] <- X[outliers,1] + rnorm(length(outliers), mean=100,sd=10)
+  X <- rbind(X[-outliers,], X[outliers,])
+  y <- c(y[-outliers], y[outliers])
+  my_data <- data.frame(y, X)
+  write.table(my_data, file=paste("rvd/m",
+                                m-length(outliers),
+                                "n",n, 
+                                "m_outliers", length(outliers), 
+                                "i", i, 
+                                ".csv",
+                                sep=""),
+            quote=FALSE,
+            row.names=FALSE,
+            col.names=FALSE,
+            sep=","
+  )
+}
+```
+
+
+
+Bertsimas and Mazumder (2014)
+
+```{r}
+gen_sample <- function(m,n,my_pi,type, i) {
+  X <- matrix(rnorm(m*n, sd=100),
+              ncol=n)
+  eps <- rnorm(m, sd=10)
+  beta <- rep(1, n)
+  y <- X %*% beta + eps
+  outliers <- sample(1:m, size=floor(my_pi*m))
+  if (type == "A") {
+    X[outliers,1] <- X[outliers,1] + 1000
+  } else if (type == "B") {
+    x_outliers <- outliers[1:floor(length(outliers)/2)]
+    y_outliers <- outliers[(floor(length(outliers)/2)+1):length(outliers)]
+    X[x_outliers,1] <- X[x_outliers,1] + 1000
+    y[y_outliers] <- y[y_outliers] + 1000
+  }
+  X <- rbind(X[-outliers,], X[outliers,])
+  y <- c(y[-outliers], y[outliers])
+  my_data <- data.frame(y, X)
+  write.table(my_data, file=paste("bm/m",
+                                m-length(outliers),
+                                "n",n+1, 
+                                "m_outliers", length(outliers), 
+                                "i", i, 
+                                ".csv",
+                                sep=""),
+            quote=FALSE,
+            row.names=FALSE,
+            col.names=FALSE,
+            sep=","
+  )
+}
+```
+
+
+
+```{r}
+set.seed(12345)
+for (i in 0:9) {
+    gen_sample(201, 5, 0.4, "B", i) # Ex-1
+    gen_sample(201, 10, 0.5, "B", i) # Ex-2
+    gen_sample(501, 5, 0.4, "A", i) # Ex-3
+    gen_sample(501, 10, 0.4, "A", i) # Ex-4
+    gen_sample(2001, 10, 0.4, "B", i) # Ex-5
+    gen_sample(5001, 10, 0.4, "B", i) # Ex-6
+    gen_sample(10001, 20, 0.4, "B", i) # Ex-7
+    
+    gen_sample_rvd(100, 3, 0.4, i) # RVD
+    gen_sample_rvd(100, 5, 0.4, i) # RVD
+    gen_sample_rvd(500, 3, 0.4, i) # RVD
+    gen_sample_rvd(500, 5, 0.4, i) # RVD
+    gen_sample_rvd(1000, 5, 0.35, i) # RVD
+    gen_sample_rvd(1000, 10, 0.35, i) # RVD
+    gen_sample_rvd(10000, 5, 0.40, i) # RVD
+    gen_sample_rvd(10000, 10, 0.40, i) # RVD
+    gen_sample_rvd(50000, 5, 0.40, i) # RVD
+    
+}
+```
+
+
+Real datasets.
+For NOxEmissions, row 5404 is an outlier (identified in R package robustbase), but Bertsimas and Mazumder contaminate in a different way.  We will just count it as one of the points like they do.
+
+No indication of which are outliers in  Maronna et al. for alcohol.  
+
+```{r}
+attach(NOxEmissions)
+dim(NOxEmissions)
+
+for (i in 0:9) {
+  X <- NOxEmissions[,c(4,1,3)]
+  y <- NOxEmissions[,2]
+  m <- nrow(X)
+  n <- ncol(X)
+  my_pi <- 0.01
+  outliers <- sample(1:m, size=floor(my_pi*m))
+  x_outliers <- outliers[1:floor(length(outliers)/2)]
+  y_outliers <- outliers[(floor(length(outliers)/2)+1):length(outliers)]
+  X[x_outliers,1] <- X[x_outliers,1] + 1000
+  y[y_outliers] <- y[y_outliers] + 1000
+  X <- rbind(X[-outliers,], X[outliers,])
+  y <- c(y[-outliers], y[outliers])
+  
+  my_data <- data.frame(y, X)
+  
+  write.table(my_data, file=paste("bm-nox/m",
+                                  m-length(outliers),
+                                  "n",n+1, 
+                                  "m_outliers", length(outliers),
+                                   "i", i,
+                                  "_nox.csv",
+                                  sep=""),
+              quote=FALSE,
+              row.names=FALSE,
+              col.names=FALSE,
+              sep=","
+    )
+}
+```
+

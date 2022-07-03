@@ -1,0 +1,315 @@
+---
+title: "Tests for Hyperplane Fitting"
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+Load libraries.
+```{r}
+library(MASS)
+set.seed(123456)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#library(knitr)
+#knit_hooks$set(webgl = hook_webgl)
+##cat('<script type="text/javascript">', readLines(system.file('WebGL', 
+##    'CanvasMatrix.js', package = 'rgl')), '</script>', sep = '\n')
+#hook_plot = knit_hooks$get('plot')
+#knit_hooks$set(plot = function(x, options) paste('\n', hook_plot(x, options), sep = ''))
+```
+
+Function for sum of squared distances of non-outlier points to a hyperplane.
+```{r}
+hyper_dist_sq <- function(w,b,x) {
+  (sum(w*x) + b)^2/sum(w*w)
+}
+```
+
+
+```{r}
+generate_data <- function(m, 
+                          n, 
+                          prefix, 
+                          iteration=0) {
+  #V <- runif(n=n*(n-1),min=-1, max=1)
+  #V <- matrix(V, ncol=n-1) # the columns of V are basis vectors for the hyperplane
+  my_norm <- runif(n, min=-1, max=1)
+  my_norm <- my_norm/sqrt(sum(my_norm*my_norm))
+  V <- diag(n) - my_norm %*% t(my_norm)
+  V <-  svd(V)$u[,1:(n-1)]
+  A <- runif(n=m*(n-1), min=-100, max=100)
+  A <- matrix(A, ncol=n-1) # the rows of A are the multipliers for each point
+  beta <- runif(n, min=-100, max=100)  # beta is the offset from the origin.
+  #my_norm <- svd(V %*% t(A))$u[,n] # normal vector to hyperplane
+  X <- V %*% t(A) + beta
+  X <- t(X)
+  print(m)
+  print(n)
+  print(dim(X))
+  print(iteration)
+  my_intercept <- -sum(my_norm*X[1,])
+  # add noise orthogonal to hyperplane
+  X <- t(apply(X, 1, function(x) {x + rnorm(n=1, mean=0, sd=1)*my_norm}))
+
+  num_outliers <- sample(1:(m-1), size=1)  # outFrac is at most 0.5
+  num_clust <- sample(1:min(10, num_outliers), size=1) # if num_clust > num_outliers, then some clusters won't have outliers and that is handled below
+  outlier_to_clust <- sample(1:num_clust, size=num_outliers, replace=TRUE)
+
+  instance_data <- c(iteration, m, n, num_clust)
+  actual_clust <- num_clust
+  if (num_clust > 0) {
+    outlier_centers <- matrix(nrow=num_clust, ncol=n-1)
+    distances <- c()
+    for (i in 1:num_clust) {
+      distance_to_center <- runif(n=1,50,100)
+      distances <- c(distances, distance_to_center)
+      outlier_centers[i,] <- runif(n=n-1, min=-100+distance_to_center, max=100-distance_to_center) # multipliers
+      outlier_centers[i, outlier_centers[i,] < 0] <- 100 + outlier_centers[i, outlier_centers[i,] < 0]
+      outlier_centers[i, outlier_centers[i,] > 0] <- 100 - outlier_centers[i, outlier_centers[i,] > 0]
+    }
+    outlier_centers <- V %*% t(outlier_centers) + beta  # point on hyperplane
+    for (i in 1:num_clust) {
+    # outlier centers are on either side of hyperplane, outlier_dist away along the normal vector
+      outlier_dist <- runif(n=1,min=1000, max=10000)
+      m_outliers <- sum(outlier_to_clust == i)
+      if (m_outliers > 0) {
+        outlier_sd <- runif(n=1,0,3)
+        side <- 2*rbinom(n=1,size=1, p=0.5)-1
+        instance_data <- c(instance_data, distances[i], outlier_dist, m_outliers, outlier_sd, side)
+        outlier_centers[,i] <- outlier_centers[,i] + 
+          side*outlier_dist*my_norm
+        X <- rbind(X, t(outlier_centers[,i] + t(matrix(mvrnorm(n=m_outliers, mu=rep(0,n), Sigma=outlier_sd*diag(n)), nrow=m_outliers))))
+      } else {
+        actual_clust <- actual_clust -1
+      }
+    }
+  }
+  #same_side <- TRUE
+  #if (num_clust == 2) {
+  #  if ((sum(my_norm*outlier_centers[,1]) + my_intercept > 0) != (sum(my_norm*outlier_centers[,2]) + my_intercept > 0)) {
+  #    same_side <- FALSE 
+  #  }
+  #}
+  #instance_data <- c(m, n, m_outliers, num_clust, same_side,
+  #                   outlier_dist, iteration)
+  cat(c(iteration,
+        my_intercept, 
+        my_norm, "\n"), 
+      file=paste(prefix, "/true_norms.csv", sep=""), 
+      append=TRUE,
+      sep=",")
+  non_means <- apply(X[1:m,], 2, mean)
+  non_pca <- prcomp(X[1:m,])
+  non_intercept <- -sum(non_means*non_pca$rotation[,n])
+  non_sq_dist <- sum(apply(X[1:m,],  
+                           1,  
+                           hyper_dist_sq,  
+                           w=non_pca$rotation[,n],   
+                           b=non_intercept))
+  cat(c(iteration,
+        non_sq_dist, "\n"),
+      file=paste(prefix,"/non_outlier_euclid_error.csv",sep=""), 
+      append=TRUE,
+      sep=",") 
+  cat(c(iteration, 
+        non_intercept,
+        non_pca$rotation[,n], "\n"), 
+      file=paste(prefix, "/non_outlier_euclid_norms.csv",sep=""), 
+      append=TRUE,
+      sep=",")
+  same_side <- FALSE
+  write.table(X,
+              file=paste(prefix,"/",
+                         "m",formatC(m, format="d"),
+                         "n",n,
+                         "num_clust",actual_clust,
+                         "i", iteration, ".csv", sep=""),
+              sep=",", row.names=FALSE,col.names=FALSE)
+  #cat(c(iteration, m, n, m_outliers, num_clust, NA,
+  #      distance_to_center,
+  #      NA, outlier_dist[1], NA,
+  #      NA, outlier_sd, NA, NA, "\n"),
+      cat(c(instance_data, "\n"),
+      file=paste(prefix, "/config.txt", sep=""),
+      append=TRUE,
+      sep=",")
+
+  my_means <- apply(X, 2, mean)
+  my_pca <- prcomp(X, center=TRUE)
+  pca_intercept <- -sum(my_means*my_pca$rotation[,n])
+  pca_error <- sum(apply(X[1:m, ], 1, hyper_dist_sq, w=my_pca$rotation[,n], b=pca_intercept))
+  my_medians <- apply(X, 2, median)
+  true_dist <- sum(apply(X[1:m,], 
+                           1,  
+                           hyper_dist_sq,  
+                           w=my_norm,
+                           b=my_intercept))
+  cat(c(iteration,pca_error,true_dist,
+        "\n"),
+      file=paste(prefix, "/error.txt", sep=""),
+      append=TRUE,
+      sep=",")
+
+  return(list(X, my_norm, my_intercept))
+}
+```
+
+```{r}
+prep_output <- function(prefix) {
+  dir.create(prefix)
+  cat(c("iteration", "iteration", "intercept", "norm\n"),
+      file=paste(prefix,"/non_outlier_euclid_norms.csv", sep=""), 
+      sep=",") 
+  cat(c("iteration", "intercept", "norm\n"), 
+      file=paste(prefix,"/true_norms.csv", sep=""), 
+      sep=",") 
+  cat(c("iteration", "non_outlier_sq_error\n"), 
+      file=paste(prefix,"/non_outlier_euclid_error.csv", sep=""), 
+      sep=",") 
+  cat(c("iteration","m", "n", "num_clust", "distance_to_center", 
+        "outlier_dist","m_outliers","outlier_sd","side", 
+        "\n"), 
+      file=paste(prefix,"/config.txt", sep=""), 
+      sep=",") 
+   cat(c("iteration", "pca_error", "true_dist", "\n"), 
+      file=paste(prefix,"/error.txt", sep=""), 
+      sep=",") 
+  cat(as.character(Sys.time()), file=paste(prefix,"/time.txt", sep=""))
+}
+```
+
+
+
+var everything
+```{r}
+prefix <- "clustered_outliers"
+prep_output(prefix)
+
+
+num_sets <- 0
+# 10 <= n <= 150
+for (j in 0:124) {
+  n <- sample(10:150, size=1) 
+  m <- sample(n:(2*n), size=1)# so m/n is above 1 and below 2; mtot/n will be larger
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+
+for (j in 125:249) {
+  n <- sample(10:150, size=1) 
+  m <- sample((2*n):2000, size=1)# so m/n is above 2
+  print("new")
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+
+# 150 < n <= 150
+for (j in 0:124) {
+  n <- sample(151:350, size=1) 
+  m <- sample(n:(2*n), size=1)# so m/n is above 1 and below 2; mtot/n will be larger
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+
+for (j in 125:249) {
+  n <- sample(151:350, size=1) 
+  m <- sample((2*n):2000, size=1)# so m/n is above 2
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+
+# 350 < n <= 500
+for (j in 0:124) {
+  n <- sample(351:500, size=1) 
+  m <- sample(n:(2*n), size=1)# so m/n is above 1 and below 2; mtot/n will be larger
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+
+for (j in 125:249) {
+  n <- sample(351:500, size=1) 
+  m <- sample((2*n):2000, size=1)# so m/n is above 2
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+
+# 500 < n <= 1000
+for (j in 0:124) {
+  n <- sample(501:1000, size=1) 
+  m <- sample(n:(2*n), size=1)# so m/n is above 1 and below 2; mtot/n will be larger
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+
+for (j in 125:249) {
+  n <- sample(501:1000, size=1) 
+  m <- sample((2*n):2000, size=1)# so m/n is above 2
+  print(m)
+  print(n)
+  my_data <- generate_data( 
+         m=m, 
+         n=n, 
+         prefix=prefix,
+         iteration=num_sets
+        )
+  num_sets <- num_sets + 1
+}
+```
+
+
+
+
+
