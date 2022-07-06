@@ -9,7 +9,7 @@
 %   1. Run CBgen to obtain hyperplane fit.
 %   2. Select the q points closest to the the CBgen HP
 %   3. Solve an LP on the q retained points to minimize the maximum error
-%   4. Return the gamma from this LP, and the HP equation
+%   4. Return HP equation, and the gammas from this LP, and over all pts
 
 % INPUTS:
 %  Ain: the data matrix
