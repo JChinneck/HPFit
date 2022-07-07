@@ -20,13 +20,11 @@
 %      - if q = 0 then take the q from CBgen
 %    .maxDist: points closer than this distance to a hyperplane are
 %      "close". Distance is Euclidean.
-%      There are 3 cases:
+%      There are 2 cases (0 is an error):
 %         < 0: -maxDist is the percentile of distances from the first
 %               hyperplane. Note it is in %. 
 %               NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
 %               If maxDist is not specified, then -16 is used.
-%         = 0: means that closeAll is not used to help identify the
-%              best hyperplane. Result is just the final hyperplane.
 %         > 0: an actual Euclidean distance to define maxDist. 
 % OUTPUTS:
 %  output: the results for CBqgen
