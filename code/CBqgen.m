@@ -76,8 +76,7 @@ output.q = q;
 fprintf("-----CBgen starts-----\n")
 CBparam.maxDist = qparams.maxDist;
 CBparam.mgood = 0;
-%FIX: use actual routine name
-[inc] = CBgenFinalV2(Ain,CBparam);
+[inc] = CBgen(Ain,CBparam);
 fprintf("-----CBgen ends-----\n")
 maxDist = inc.maxDist;
 output.maxDist = maxDist;
