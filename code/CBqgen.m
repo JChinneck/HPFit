@@ -91,7 +91,7 @@ if inc.status == -1
     return
 end
 if inc.status == 1
-    fprintf("  CBgen exact solution: aborting MIO solution.\n")
+    fprintf("  CBgen exact solution: aborting solution: gamma is zero.\n")
     output.status = "Exact solution";
     output.gamma = 0.0;
     return
