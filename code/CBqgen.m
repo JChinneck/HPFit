@@ -1,4 +1,4 @@
-% July 6, 2022
+% July 7, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -20,11 +20,13 @@
 %      - if q = 0 then take the q from CBgen
 %    .maxDist: points closer than this distance to a hyperplane are
 %      "close". Distance is Euclidean.
-%      There are 2 cases (0 is an error):
+%      There are 3 cases:
 %         < 0: -maxDist is the percentile of distances from the first
 %               hyperplane. Note it is in %. 
 %               NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
 %               If maxDist is not specified, then -16 is used.
+%         = 0: means that closeAll is not used to help identify the
+%              best hyperplane. Result is just the final hyperplane.
 %         > 0: an actual Euclidean distance to define maxDist. 
 % OUTPUTS:
 %  output: the results for CBqgen
@@ -36,6 +38,7 @@
 %    .weights: the solution hyperplane weights
 %    .gammaLP: gamma for the solution hyperplane on the point subset
 %    .gamma: gamma using solution hyperplane on all points.
+%    .z: binary vector indicating which points are included in the q closest
 %  inc: the output structure for CBgen
 %
 % DEPENDENCIES: this routine calls:
@@ -92,7 +95,7 @@ if inc.status == -1
     return
 end
 if inc.status == 1
-    fprintf("  CBgen exact solution: aborting solution: gamma is zero.\n")
+    fprintf("  CBgen exact solution: aborting MIO solution.\n")
     output.status = "Exact solution";
     output.gamma = 0.0;
     output.gammaLP = 0.0;
@@ -112,9 +115,7 @@ sortedEdist = sortrows(sortedEdist,2);
 % Construct subset of data using only the q closest points
 B = zeros(q,n);
 % z indicates which rows are among the q closest
-z = zeros(m,1);
 for i=1:q
-    z(sortedEdist(i,1),1) = 1;
     B(i,:) = Ain(sortedEdist(i,1),:);
 end
 
@@ -159,9 +160,16 @@ output.gammaLP = result.x(n+2*q+1,1);
 % calculate gamma over all points relative to the output hyperplane
 % Calculate the point distances from the hyperplane
 edist = abs(Ain*output.weights - output.RHS);
-sortedEdist = sort(edist);
-output.gamma = sortedEdist(q,1);
+sortedEdist = [(1:m)',edist];
+sortedEdist = sortrows(sortedEdist,2);
+output.gamma = sortedEdist(q,2);
+% output.z indicates the q points having the smallest error
+output.z = zeros(m,1);
+for i=1:q
+    output.z(sortedEdist(i,1),1) = 1;
+end
 
 return
 end
+
 
