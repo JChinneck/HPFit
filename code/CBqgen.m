@@ -88,12 +88,14 @@ if inc.status == -1
     fprintf("  CBgen failure: aborting solution.\n")
     output.status = "ABORTED";
     output.gamma = Inf;
+    output.gammaLP = Inf;
     return
 end
 if inc.status == 1
     fprintf("  CBgen exact solution: aborting solution: gamma is zero.\n")
     output.status = "Exact solution";
     output.gamma = 0.0;
+    output.gammaLP = 0.0;
     return
 end
 
