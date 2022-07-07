@@ -17,7 +17,7 @@
 %    .q: MIO minimizes the qth deviation from the hyperplane. 
 %      - if q > 0 it is the percentile of the m points in the data set
 %      - if q < 0 then -q is the actual ordinal number (not percentile)
-%      - if q = 0 then take the q from CBgen
+%      - q = 0 is an error
 %    .maxDist: points closer than this distance to a hyperplane are
 %      "close". Distance is Euclidean.
 %      There are 3 cases:
@@ -27,9 +27,10 @@
 %               If maxDist is not specified, then -16 is used.
 %         = 0: means that closeAll is not used to help identify the
 %              best hyperplane. Result is just the final hyperplane.
-%         > 0: an actual Euclidean distance to define maxDist. 
+%         > 0: a Euclidean distance value for maxDist. 
 % OUTPUTS:
 %  output: the results for CBqgen
+%    .status: CBgen exit status
 %    .q: the integer value associated with the input qparams.q
 %    .maxDist: the maximum Euclidean distance for "close" points as found
 %              by CBgen
@@ -38,7 +39,7 @@
 %    .weights: the solution hyperplane weights
 %    .gammaLP: gamma for the solution hyperplane on the point subset
 %    .gamma: gamma using solution hyperplane on all points.
-%    .z: binary vector indicating which points are included in the q closest
+%    .z: binary vector indicating the q closest points
 %  inc: the output structure for CBgen
 %
 % DEPENDENCIES: this routine calls:
@@ -59,6 +60,7 @@ n = size(Ain,2);
 q = qparams.q;
 if q == 0
     fprintf("q = 0 is invalid. Aborting.\n")
+    output.status = "Aborted_q=0";
     return
 end
 if q > 0
@@ -86,17 +88,17 @@ output.maxDist = maxDist;
 fprintf("  CBgen sets maxDist at %f\n",maxDist)
 
 output.CBgenTime = toc(tStart);
-
+output.status = "CBgen_succeeds";
 if inc.status == -1
     fprintf("  CBgen failure: aborting solution.\n")
-    output.status = "ABORTED";
+    output.status = "CBgen_aborted";
     output.gamma = Inf;
     output.gammaLP = Inf;
     return
 end
 if inc.status == 1
     fprintf("  CBgen exact solution: aborting MIO solution.\n")
-    output.status = "Exact solution";
+    output.status = "CBgen_exact_solution";
     output.gamma = 0.0;
     output.gammaLP = 0.0;
     return
@@ -171,5 +173,3 @@ end
 
 return
 end
-
-
