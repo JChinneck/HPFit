@@ -163,10 +163,10 @@ output.gammaLP = result.x(n+2*q+1,1);
 
 % calculate gamma over all points relative to the output hyperplane
 % Calculate the point distances from the hyperplane
-edist = abs(Ain*output.weights - output.RHS);
-sortedEdist = [(1:m)',edist];
-sortedEdist = sortrows(sortedEdist,2);
-output.gamma = sortedEdist(q,2);
+dist = abs(Ain*output.weights - output.RHS);
+sortedDist = [(1:m)',dist];
+sortedDist = sortrows(sortedDist,2);
+output.gamma = sortedDist(q,2);
 output.gammaN = output.gamma/output.RHS*n;
 % output.z indicates the q points having the smallest error
 output.z = zeros(m,1);
