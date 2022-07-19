@@ -1,4 +1,4 @@
-% July 7, 2022
+% July 19, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -39,6 +39,8 @@
 %    .weights: the solution hyperplane weights
 %    .gammaLP: gamma for the solution hyperplane on the point subset
 %    .gamma: gamma using solution hyperplane on all points.
+%    .gammaN: this is .gamma scaled to a right-hand-side constant of n, the
+%       number of variables, for a fair comparison with other methods
 %    .z: binary vector indicating the q closest points
 %  inc: the output structure for CBgen
 %
@@ -165,6 +167,7 @@ edist = abs(Ain*output.weights - output.RHS);
 sortedEdist = [(1:m)',edist];
 sortedEdist = sortrows(sortedEdist,2);
 output.gamma = sortedEdist(q,2);
+output.gammaN = output.gamma/output.RHS*n;
 % output.z indicates the q points having the smallest error
 output.z = zeros(m,1);
 for i=1:q
