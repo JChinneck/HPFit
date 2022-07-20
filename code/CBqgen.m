@@ -1,4 +1,4 @@
-% July 19, 2022
+% July 20, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -162,12 +162,12 @@ output.RHS = inc.RHSOut;
 output.gammaLP = result.x(n+2*q+1,1);
 
 % calculate gamma over all points relative to the output hyperplane
-% Calculate the point distances from the hyperplane
+% Calculate the absolute point distances from the hyperplane
 dist = abs(Ain*output.weights - output.RHS);
 sortedDist = [(1:m)',dist];
 sortedDist = sortrows(sortedDist,2);
 output.gamma = sortedDist(q,2);
-output.gammaN = output.gamma/output.RHS*n;
+output.gammaN = abs(output.gamma/output.RHS*n);
 % output.z indicates the q points having the smallest error
 output.z = zeros(m,1);
 for i=1:q
