@@ -1,4 +1,4 @@
-% July 7, 2022
+% August 4, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -8,8 +8,10 @@
 % Main steps are:
 %   1. Run CBreg to obtain hyperplane fit.
 %   2. Select the q points closest to the the CBreg HP
-%   3. Solve an LP on the q retained points to minimize the maximum error
-%   4. Return HP equation, and the gammas from this LP, and over all pts
+%   3. Cycle until no reduction in gamma:
+%      3.1 Solve LP on the q retained points to minimize the maximum error
+%      3.2 Calculate gamma from resulting HP
+%      3.3 Select the q points closest to HP
 
 % INPUTS:
 %  Ain: the data matrix
@@ -35,7 +37,8 @@
 %    .maxResid: the maximum error for "close" points as found by CBreg
 %    .CBreg time: time taken to run CBreg
 %    .RHS: the solution hyperplane RHS constant
-%    .weights: the solution hyperplane weights
+%    .w: the solution hyperplane weights
+%    .w0: the solution hypeplane constant
 %    .gammaLP: gamma for the solution hyperplane on the point subset
 %    .gamma: gamma using solution hyperplane on all points.
 %    .z: binary vector indicating the q points with the smallest residuals
@@ -121,52 +124,73 @@ for i=1:q
 end
 
 %--------------------------------------------------------------------------
-% STEP 3: solve LP to minimize maximum error on B
+% STEP 3: solve LP to minimize maximum error on B, in a cycle.
 
 % Set up the gurobi parameters
 gbparams = struct();
-gbparams.OutputFlag = 0;
+gbparams.OutputFlag = 0; 
+gammaBest = Inf;
 
-% Initialize the constraint matrix
-% row order: q elastic constraints, q error constraints
-% col order: n w, q eplus, q eminus, 1 emax
-model.A = sparse(2*q,n+2*q+1);
-model.rhs = zeros(2*q,1);
-% q elastic cons, of form wo + w1x1 + w2x2 + ... +wnxn + eplus - eminus = y. 
-model.A(1:q,1:n+2*q) = [sparse(B),speye(q),-speye(q)];
-model.rhs(1:q,1) = yB;
-model.sense(1:q,1) = repmat('=',q,1);
-% q error constraints of form eplus_i + eminus_i - emax <= 0
-model.A(q+1:2*q,n+1:n+2*q) = [speye(q),speye(q)];
-model.A(q+1:2*q,n+2*q+1) = sparse(-ones(q,1));
-model.sense(q+1:2*q,1) = repmat('<',q,1);
-% variable lower bounds
-model.lb = [zeros(n,1)-Inf;zeros(q*2+1,1)];
-% variable upper bounds
-model.ub = zeros(n+2*q+1,1)+Inf;
-% specify variable types
-model.vtype = repmat('C',n+2*q+1,1);
-% set up objective function to minimize gamma
-model.obj = [zeros(n+2*q,1);1.0];
-model.modelsense = 'min';
-
-% solve LP to minimize emax and return the HP equation
-result = gurobi(model, gbparams);
-output.w0 = result.x(1,1);
-output.w = result.x(2:n,1);
-output.gammaLP = result.x(n+2*q+1,1);
-
-% calculate gamma over all points relative to the output hyperplane
-% Calculate the point distances from the hyperplane
-absResid = abs(output.w0 + Ain*output.w - y);
-sortedAbsResid = [(1:m)',absResid];
-sortedAbsResid = sortrows(sortedAbsResid,2);
-output.gamma = sortedAbsResid(q,2);
-% z marks the q points having smallest residuals
-z = zeros(m,1);
-for i=1:q
-    z(sortedAbsResid(i,1),1) = 1;
+for itn =1:m
+    % Initialize the constraint matrix
+    % row order: q elastic constraints, q error constraints
+    % col order: n w, q eplus, q eminus, 1 emax
+    model.A = sparse(2*q,n+2*q+1);
+    model.rhs = zeros(2*q,1);
+    % q elastic cons, of form wo + w1x1 + w2x2 + ... +wnxn + eplus - eminus = y.
+    model.A(1:q,1:n+2*q) = [sparse(B),speye(q),-speye(q)];
+    model.rhs(1:q,1) = yB;
+    model.sense(1:q,1) = repmat('=',q,1);
+    % q error constraints of form eplus_i + eminus_i - emax <= 0
+    model.A(q+1:2*q,n+1:n+2*q) = [speye(q),speye(q)];
+    model.A(q+1:2*q,n+2*q+1) = sparse(-ones(q,1));
+    model.sense(q+1:2*q,1) = repmat('<',q,1);
+    % variable lower bounds
+    model.lb = [zeros(n,1)-Inf;zeros(q*2+1,1)];
+    % variable upper bounds
+    model.ub = zeros(n+2*q+1,1)+Inf;
+    % specify variable types
+    model.vtype = repmat('C',n+2*q+1,1);
+    % set up objective function to minimize gamma
+    model.obj = [zeros(n+2*q,1);1.0];
+    model.modelsense = 'min';
+    
+    % solve LP to minimize emax and return the HP equation
+    result = gurobi(model, gbparams);
+    
+    w0 = result.x(1,1);
+    w = result.x(2:n,1);
+    gammaLP = result.x(n+2*q+1,1);
+    
+    % calculate gamma over all points relative to the output hyperplane
+    % Calculate the point distances from the hyperplane
+    absResid = abs(w0 + Ain*w - y);
+    sortedAbsResid = [(1:m)',absResid];
+    sortedAbsResid = sortrows(sortedAbsResid,2);
+    gamma = sortedAbsResid(q,2);
+    
+    if gamma >= gammaBest
+        break
+    end
+    gammaBest = gamma;
+    
+    output.gamma = gamma;
+    output.w0 = w0;
+    output.w = w;
+    output.gammaLP = gammaLP;
+    
+    fprintf ("Gamma is %f at itn %d.\n",output.gamma,itn)
+    
+    % Set up for the next iteration
+    % z marks the q points having smallest residuals
+    output.z = zeros(m,1);
+    B = zeros(q,n);
+    yB = zeros(q,1);
+    for i=1:q
+        output.z(sortedAbsResid(i,1),1) = 1;
+        B(i,:) = A(sortedAbsResid(i,1),:);
+        yB(i,1) = y(sortedAbsResid(i,1),1);
+    end
 end
-
 return
 end
