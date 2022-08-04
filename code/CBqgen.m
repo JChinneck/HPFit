@@ -1,4 +1,4 @@
-% July 20, 2022
+% August 4, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -8,8 +8,10 @@
 % steps are:
 %   1. Run CBgen to obtain hyperplane fit.
 %   2. Select the q points closest to the the CBgen HP
-%   3. Solve an LP on the q retained points to minimize the maximum error
-%   4. Return HP equation, and the gammas from this LP, and over all pts
+%   3. Cycle until no reduction in gamma:
+%      3.1 Solve LP on the q retained points to minimize the maximum error
+%      3.2 Calculate gamma from resulting HP
+%      3.3 Select the q points closest to HP
 
 % INPUTS:
 %  Ain: the data matrix
@@ -124,55 +126,74 @@ for i=1:q
 end
 
 %--------------------------------------------------------------------------
-% STEP 3: solve LP to minimize maximum error on B
+% STEP 3: solve LP to minimize maximum error on B, in a cycle
 
 % Set up the gurobi parameters
 gbparams = struct();
 gbparams.OutputFlag = 0;
 
-% Initialize the constraint matrix
-% row order: q elastic constraints, q error constraints
-% col order: n w, q eplus, q eminus, 1 emax
-model.A = sparse(2*q,n+2*q+1);
-model.rhs = zeros(2*q,1);
-% q elastic cons, of form w1x1 + w2x2 + ... +wnxn + eplus - eminus = RHS. 
-% Note use of the RHS output by CBgen
-output.RHS = inc.RHSOut;
-model.A(1:q,1:n+2*q) = [sparse(B),speye(q),-speye(q)];
-model.rhs(1:q,1) = zeros(q,1) + inc.RHSOut;
-model.sense(1:q,1) = repmat('=',q,1);
-% q error constraints of form eplus_i + eminus_i - emax <= 0
-model.A(q+1:2*q,n+1:n+2*q) = [speye(q),speye(q)];
-model.A(q+1:2*q,n+2*q+1) = sparse(-ones(q,1));
-model.sense(q+1:2*q,1) = repmat('<',q,1);
-% variable lower bounds
-model.lb = [zeros(n,1)-Inf;zeros(q*2+1,1)];
-% variable upper bounds
-model.ub = zeros(n+2*q+1,1)+Inf;
-% specify variable types
-model.vtype = repmat('C',n+2*q+1,1);
-% set up objective function to minimize gamma
-model.obj = [zeros(n+2*q,1);1.0];
-model.modelsense = 'min';
+gammaBest = Inf;
+for itn = 1:m
+    % Initialize the constraint matrix
+    % row order: q elastic constraints, q error constraints
+    % col order: n w, q eplus, q eminus, 1 emax
+    model.A = sparse(2*q,n+2*q+1);
+    model.rhs = zeros(2*q,1);
+    % q elastic cons, of form w1x1 + w2x2 + ... +wnxn + eplus - eminus = RHS.
+    % Note use of the RHS output by CBgen
+    output.RHS = inc.RHSOut;
+    model.A(1:q,1:n+2*q) = [sparse(B),speye(q),-speye(q)];
+    model.rhs(1:q,1) = zeros(q,1) + inc.RHSOut;
+    model.sense(1:q,1) = repmat('=',q,1);
+    % q error constraints of form eplus_i + eminus_i - emax <= 0
+    model.A(q+1:2*q,n+1:n+2*q) = [speye(q),speye(q)];
+    model.A(q+1:2*q,n+2*q+1) = sparse(-ones(q,1));
+    model.sense(q+1:2*q,1) = repmat('<',q,1);
+    % variable lower bounds
+    model.lb = [zeros(n,1)-Inf;zeros(q*2+1,1)];
+    % variable upper bounds
+    model.ub = zeros(n+2*q+1,1)+Inf;
+    % specify variable types
+    model.vtype = repmat('C',n+2*q+1,1);
+    % set up objective function to minimize gamma
+    model.obj = [zeros(n+2*q,1);1.0];
+    model.modelsense = 'min';
+    
+    % solve LP to minimize emax and return the HP equation
+    result = gurobi(model, gbparams);
+    weights = result.x(1:n,1);
+    RHS = inc.RHSOut;
+    gammaLP = result.x(n+2*q+1,1);
+    
+    % calculate gamma over all points relative to the output hyperplane
+    % Calculate the absolute point distances from the hyperplane
+    dist = abs(Ain*weights - RHS);
+    sortedDist = [(1:m)',dist];
+    sortedDist = sortrows(sortedDist,2);
+    gamma = sortedDist(q,2);
+    gammaN = abs(gamma/RHS*n);
+    
+    if gammaN >= gammaBest
+        break
+    end
+    gammaBest = gammaN;
+    
+    output.gamma = gamma;
+    output.gammaN = gammaN;
+    output.gammaLP = gammaLP;
+    output.weights = weights;
+    output.RHS = RHS;
+    fprintf ("Gamma is %f at itn %d.\n",output.gammaN,itn)
 
-% solve LP to minimize emax and return the HP equation
-result = gurobi(model, gbparams);
-output.weights = result.x(1:n,1);
-output.RHS = inc.RHSOut;
-output.gammaLP = result.x(n+2*q+1,1);
-
-% calculate gamma over all points relative to the output hyperplane
-% Calculate the absolute point distances from the hyperplane
-dist = abs(Ain*output.weights - output.RHS);
-sortedDist = [(1:m)',dist];
-sortedDist = sortrows(sortedDist,2);
-output.gamma = sortedDist(q,2);
-output.gammaN = abs(output.gamma/output.RHS*n);
-% output.z indicates the q points having the smallest error
-output.z = zeros(m,1);
-for i=1:q
-    output.z(sortedEdist(i,1),1) = 1;
+    % Set up for the next iteration
+    % output.z indicates the q points having the smallest error
+    B = zeros(q,n);
+    output.z = zeros(m,1);
+    for i=1:q
+        output.z(sortedDist(i,1),1) = 1;
+        B(i,:) = Ain(sortedDist(i,1),:);
+    end
 end
-
 return
 end
+
