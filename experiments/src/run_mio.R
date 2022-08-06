@@ -68,13 +68,14 @@ fit_lqs <- function(j, X, m, n, q) {
   lqs_norm[is.na(lqs_norm)] <- 0.0
   lqs_norm <- append(lqs_norm, -1.0, after=j-1) # The coefficient for the response is -1
   lqs_intercept <- my_lqs$coefficients[1] # get the intercept
-  lqs_dist <- sum(apply(X[1:m,],
-                       1,
-                       hyper_dist_sq,
-                       w=lqs_norm,
-                       b=lqs_intercept)) # sum of squared distances to the hyperplane for non-outliers
   lqs_res <- apply(X,1,hyper_dist_sq,w=lqs_norm,b=lqs_intercept) # sum of squared distances for all points
   lqs_rq <- quantile(lqs_res, q) # get the q^th percentile residual
+  lqs_dist <- lqs_rq
+  #lqs_dist <- sum(apply(X[1:m,],
+  #                     1,
+  #                     hyper_dist_sq,
+  #                     w=lqs_norm,
+  #                     b=lqs_intercept)) # sum of squared distances to the hyperplane for non-outliers
   return(
          list(
               lqs_dist=lqs_dist, # non-outlier distances
@@ -156,12 +157,18 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
         run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
       }
     }
-  } else{ # MIO1 or MIO-BM
+  } else if (formulation == "alg3-mio-bm" | formulation == "alg3-mio1" | formulation == "lqs-mio-bm" | formulation == "lqs-mio1") { # MIO1 or MIO-BM
     if (dep_var == TRUE) { # first variable is response 
       print(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) 
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
     } else {
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+    }
+  } else if (formulation == "cbq-mio1" | formulation == "cbq-mio-bm") {
+    if (dep_var == TRUE) {
+      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "run_cbqmio(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+    } else{
+      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "run_cbqmio(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
     }
   }
 }

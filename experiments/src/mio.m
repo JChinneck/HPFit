@@ -76,7 +76,7 @@ end
 
 
 % Set up the MIP
-if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
+if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
     model.obj = [1.0; zeros(2*m,1) ; zeros(m,1); zeros(m,1); zeros(m,1); zeros(n,1)]; % gamma ; rplus/rminus; mu; mubar; z; beta
     model.lb  = [zeros(1+5*m,1); -inf(n,1)];
     if dep_var == true % dependent variable - regression; first variable is response
@@ -123,7 +123,7 @@ else % formulation is MIO1
     model.varnames = cellstr(['gamma' ; repmat('r',m, 1) + string(1:m)' ; repmat('eplus',m, 1) + string(1:m)' ; repmat('eminus',m, 1) + string(1:m)' ; repmat('z',m, 1) + string(1:m)' ; repmat('beta',n, 1) + string(1:n)']) 
 end
 for k=1:m
-    if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
         model.sos(k).type = 1;
         model.sos(k).index = [(1+2*m+m+k) (1+2*m+k)]'; % mubar, mu
         model.sos(m+k).type = 1;
@@ -135,31 +135,48 @@ for k=1:m
         model.sos(k).index = [(1+k) (1+3*m+k)]'; % r, z
     end
 end
-disp("alg 3 start")
-[beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
-beta1
-disp("alg 3 end")
-if strcmp(formulation, "mio-bm")
+if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "alg3-mio1")
+    disp("alg 3 start")
+    [beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
+    beta1
+    disp("alg 3 end")
+end
+if strcmp(formulation, "alg3-mio-bm")
     model.StartNumber = 0;
     model.start = [nan; NaN(5*m,1);   beta1];  % from algorithm 3
-else %MIO1
+end
+if strcmp(formulation, "alg3-mio1") %MIO1
     model.StartNumber = 0;
     model.start = [nan; NaN(4*m,1);   beta1];  % from algorithm 3
-
 end
 
 if strcmp(formulation, "lqs-mio-bm")% if a solution given by R's LQS method is given
-    model.StartNumber = 1;
+    model.StartNumber = 0;
     model.start = [nan; NaN(5*m,1) ; lqs_beta]; 
 end
 if strcmp(formulation, "lqs-mio1")
-    model.StartNumber = 1;
+    model.StartNumber = 0;
+    lqs_beta
     model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
 end
+
+if strcmp(formulation, "cbq-mio-bm")% if a cbq solution given 
+    model.StartNumber = 0;
+    model.start = [nan; NaN(5*m,1) ; lqs_beta] 
+end
+if strcmp(formulation, "cbq-mio1")
+    model.StartNumber = 0;
+    model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
+end
+
+
 
 model.modelsense = 'min';
 %gurobi_write(model, 'mio.lp');
 params = struct();
+if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
+    params.SolutionLimit = 1;
+end
 %params.OutputFlag = 0;
 if timelimit > 0
     params.TimeLimit = timelimit;
@@ -170,22 +187,22 @@ disp("solving")
 result = gurobi(model, params);
 result.status
 if strcmp(result.status, 'OPTIMAL')
-    if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
         beta_star = result.x((1+5*m+1):(1+5*m+n),1);
-        z = result.x(1+4*m+1:1+4*m+m,1)
+        z = result.x(1+4*m+1:1+4*m+m,1);
     else % MIO1
         beta_star = result.x((1+4*m+1):(1+4*m+n),1);
-        z = result.x(1+3*m+1:1+3*m+m,1)
+        z = result.x(1+3*m+1:1+3*m+m,1);
     end
 else 
     if result.mipgap ~= Inf
         fprintf("Using incumbent solution\n")
-        if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
+        if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
             beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
-            z = result.pool(1).xn(1+4*m+1:1+4*m+m,1)
+            z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
         else % MIO1
             beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
-            z = result.pool(1).xn(1+3*m+1:1+3*m+m,1)
+            z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
         end
     else
         fprintf("No solution available\n")
@@ -193,7 +210,7 @@ else
     end
 end
 f_beta_star = result.objval;
-qth_residuals = [f_beta1 f_beta_star];
+%qth_residuals = [f_beta1 f_beta_star];
 
 num_outliers_in_q = sum(z((m_normal+1):m,1))
 
