@@ -5,8 +5,8 @@
 #$ -N evaluation
 # tell SGE that it's an array and job numbers
 #$ -t 1-1000:1
-# tell SGE to run at most 3 jobs at once
-#$ -tc 3
+# tell SGE to run at most 7 jobs at once
+#$ -tc 7
 
 FOLNAME=unclustered_outliers # folder where data is
 EXP=cb_evaluation # experiment
@@ -37,7 +37,7 @@ echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, 
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
-#rm $RESLOC/hyper.$ID.in
-rm $RESLOC/$ID.Rout
+rm $RESLOC/hyper.$ID.in
+#rm $RESLOC/$ID.Rout
 rm $HOME/$JOBNAME.e*
 rm $HOME/$JOBNAME.o*

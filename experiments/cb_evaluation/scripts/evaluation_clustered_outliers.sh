@@ -5,8 +5,8 @@
 #$ -N evaluation
 # tell SGE that it's an array and job numbers
 #$ -t 1-1000:1
-# tell SGE to run at most 3 jobs at once
-#$ -tc 3
+# tell SGE to run at most 7 jobs at once
+#$ -tc 7
 
 FOLNAME=clustered_outliers # folder where data is
 EXP=cb_evaluation # experiment
@@ -33,11 +33,12 @@ echo "library(matlabr)" >> $RESLOC/hyper.$ID.in
 echo "options(matlab.path='/usr/local/MATLAB/R2018b/bin')" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/mpack.txt\")" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/run_competitors.R\")" >> $RESLOC/hyper.$ID.in
-echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+#echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+echo "run_alg3(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"$RESLOC\", \"$MOSEKLOC\", \"PCA\")" >> $RESLOC/hyper.$ID.in
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
-#rm $RESLOC/hyper.$ID.in
-rm $RESLOC/$ID.Rout
+rm $RESLOC/hyper.$ID.in
+#rm $RESLOC/$ID.Rout
 rm $HOME/$JOBNAME.e*
 rm $HOME/$JOBNAME.o*

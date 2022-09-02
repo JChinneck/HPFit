@@ -60,7 +60,7 @@ out_file = fopen(out_fname, "w");
 if dep_var == true
     [output,inc] = CBqreg(X(:,1), X(:,2:n), inParam)
     % filename including path, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - cb, gamma, total squared error to hyperplane (along response or orthogonal), runtime, LTS 
-    fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%f,%f,%d,%d\n", datafname, iteration, m, n, m_normal, q, "cbq", output.gammaN, -1.0, output.CBregTime, -1.0, -1,-1);
+    fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%f,%f,%d,%d\n", datafname, iteration, m, n, m_normal, q, "cbq", output.gamma, -1.0, output.CBregTime, -1.0, -1,-1);
 else
     [output,inc] = CBqgen(X, inParam)
     % filename including path, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - cb, gamma, total squared error to hyperplane (along response or orthogonal), runtime, LTS 

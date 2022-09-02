@@ -334,10 +334,18 @@ run_alg3 <- function(dataloc, srcloc, fname, q, dep_var, resloc, mosekloc, init_
   i <- as.numeric(my_regmatch[[1]][4])
   cat("\n", i, "\n")
   X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
-  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
+
   q <- floor(q*nrow(X))
-  print(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "','",init_method,"')", sep=""))
-  run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "','",init_method,"')", sep=""))
+  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
+
+  if (dep_var == TRUE) {
+    dep_var_matlab <- "true" 
+  } else{
+    dep_var_matlab <- "false"
+  }
+
+  print(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m,",",dep_var_matlab,",'", resloc, "','",init_method,"')", sep=""))
+  run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m,",",dep_var_matlab,",'", resloc, "','",init_method,"')", sep=""))
 }
 
 ## -----------------------------------------------------------------------------------------------------

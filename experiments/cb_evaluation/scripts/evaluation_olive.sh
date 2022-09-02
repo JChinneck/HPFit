@@ -12,7 +12,7 @@ FOLNAME=olive # folder where data is
 EXP=cb_evaluation # experiment
 JOBNAME=evaluation # name of job on SGE
 TIMELIMIT=60 # used for CB-MIO3
-Q=0.50
+Q=0.50 # for methods that need a q, like lqs
 DEP_VAR=TRUE
 
 SRCLOC=$HOME/HPFit/experiments/src
@@ -37,7 +37,7 @@ echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, 
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
-#rm $RESLOC/hyper.$ID.in
-rm $RESLOC/$ID.Rout
+rm $RESLOC/hyper.$ID.in
+#rm $RESLOC/$ID.Rout
 rm $HOME/$JOBNAME.e*
 rm $HOME/$JOBNAME.o*

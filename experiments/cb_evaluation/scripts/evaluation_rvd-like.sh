@@ -6,7 +6,7 @@
 # tell SGE that it's an array and job numbers
 #$ -t 1-90:1
 # tell SGE to run at most 3 jobs at once
-#$ -tc 3
+#$ -tc 7
 
 FOLNAME=rvd-like # folder where data is
 EXP=cb_evaluation # experiment
@@ -37,7 +37,7 @@ echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, 
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
-#rm $RESLOC/hyper.$ID.in
-rm $RESLOC/$ID.Rout
+rm $RESLOC/hyper.$ID.in
+#rm $RESLOC/$ID.Rout
 rm $HOME/$JOBNAME.e*
 rm $HOME/$JOBNAME.o*

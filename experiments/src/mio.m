@@ -76,25 +76,25 @@ end
 
 
 % Set up the MIP
-if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
+if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
     model.obj = [1.0; zeros(2*m,1) ; zeros(m,1); zeros(m,1); zeros(m,1); zeros(n,1)]; % gamma ; rplus/rminus; mu; mubar; z; beta
     model.lb  = [zeros(1+5*m,1); -inf(n,1)];
     if dep_var == true % dependent variable - regression; first variable is response
         model.A   = [ 
-                  sparse(-ones(m,1)) speye(m) speye(m) -speye(m) speye(m) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % rplus + rminus - gamma = mubar - mu, for each point i
+                  sparse(-ones(m,1)) speye(m) speye(m) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % rplus + rminus - gamma = mubar - mu, for each point i
                   sparse(zeros(m,1)) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(X) ; % rplus - rminus = y-x^T beta, for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(ones(1,m)) sparse(zeros(1,n)) ; % sum of zs is q
-                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % mu <= gamma, for each point i
+                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % mu <= gamma, for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) 1.0 sparse(zeros(1,n-1))] ; % beta_1=-1
       
         model.rhs = [ zeros(m,1) ; zeros(m,1) ; q ; zeros(m,1) ; -1];
         %model.rhs = [ zeros(m,1) ; zeros(m,1) ; q ; zeros(m,1) ; ones(m,1) ; -1];
     else % no dependent variable
         model.A   = [ 
-                  sparse(-ones(m,1)) speye(m) speye(m) -speye(m) speye(m) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % rplus + rminus - gamma = mubar - mu, for each point i
-                  sparse(zeros(m,1)) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(X) ; % rplus - rminus = x^T beta, for each point i
+                  sparse(-ones(m,1)) speye(m) speye(m) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % rplus + rminus - gamma = mubar - mu, for each point i
+                  sparse(zeros(m,1)) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(X) ; % rplus - rminus = -x^T beta, for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(ones(1,m)) sparse(zeros(1,n)) ; % sum of zs is q
-                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % mu <= gamma for each point i
+                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % mu <= gamma for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) 1.0 sparse(zeros(1,n-1)) ] ; % beta_0=n; n-1 because we have a column of 1s
 
         model.rhs = [ zeros(m,1) ; zeros(m,1) ; q ; zeros(m,1) ; n-1];
@@ -123,13 +123,13 @@ else % formulation is MIO1
     model.varnames = cellstr(['gamma' ; repmat('r',m, 1) + string(1:m)' ; repmat('eplus',m, 1) + string(1:m)' ; repmat('eminus',m, 1) + string(1:m)' ; repmat('z',m, 1) + string(1:m)' ; repmat('beta',n, 1) + string(1:n)']) 
 end
 for k=1:m
-    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
         model.sos(k).type = 1;
         model.sos(k).index = [(1+2*m+m+k) (1+2*m+k)]'; % mubar, mu
         model.sos(m+k).type = 1;
         model.sos(m+k).index = [(1+k) (1+m+k)]'; % rplus, rminus
         model.sos(2*m+k).type = 1;
-        model.sos(2*m+k).index = [(1+2*m+2*m+k) (1+2*m+k)]'; % z, mu
+        model.sos(2*m+k).index = [(1+2*m+2*m+k) (1+2*m+m+k)]'; % z, mubar;  this is a correction from the paper.
     else % MIO1
         model.sos(k).type = 1;
         model.sos(k).index = [(1+k) (1+3*m+k)]'; % r, z
@@ -137,36 +137,69 @@ for k=1:m
 end
 if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "alg3-mio1")
     disp("alg 3 start")
-    [beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
-    beta1
+    [beta_start, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
+    f_beta1
     disp("alg 3 end")
 end
-if strcmp(formulation, "alg3-mio-bm")
-    model.StartNumber = 0;
-    model.start = [nan; NaN(5*m,1);   beta1];  % from algorithm 3
-end
-if strcmp(formulation, "alg3-mio1") %MIO1
-    model.StartNumber = 0;
-    model.start = [nan; NaN(4*m,1);   beta1];  % from algorithm 3
+
+if strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "cbq-mio-bm")
+    beta_start = lqs_beta;
 end
 
-if strcmp(formulation, "lqs-mio-bm")% if a solution given by R's LQS method is given
+if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") %MIO-BM
+    rplus = zeros(m,1);
+    rminus = zeros(m,1);
+    mu = zeros(m,1);
+    mubar = zeros(m,1);
+    z = zeros(m,1);
     model.StartNumber = 0;
-    model.start = [nan; NaN(5*m,1) ; lqs_beta]; 
-end
-if strcmp(formulation, "lqs-mio1")
+    dist = X*beta_start;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGamma = sortedabsdist(q,2)
+    fprintf("Gamma recalculated from beta_start is %f\n", newGamma);
+    for i=1:m
+        if dist(i,1) > 0
+            rminus(i,1) = dist(i,1);
+        else
+            rplus(i,1) = -dist(i,1);
+        end
+        if rplus(i,1) + rminus(i,1) - newGamma > 0
+            mubar(i,1) = rplus(i,1) + rminus(i,1) - newGamma;
+        else
+            mu(i,1) = -rplus(i,1) - rminus(i,1) + newGamma;
+        end
+    end
+    for i=1:q
+        z(sortedabsdist(i,1),1) = 1;
+    end
+    model.start = [newGamma; rplus; rminus; mu; mubar; z; beta_start];  
+elseif strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") %MIO1
+    eplus = zeros(m,1);
+    eminus = zeros(m,1);
+    rel = zeros(m,1);
+    z = zeros(m,1);
     model.StartNumber = 0;
-    lqs_beta
-    model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
-end
-
-if strcmp(formulation, "cbq-mio-bm")% if a cbq solution given 
-    model.StartNumber = 0;
-    model.start = [nan; NaN(5*m,1) ; lqs_beta] 
-end
-if strcmp(formulation, "cbq-mio1")
-    model.StartNumber = 0;
-    model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
+    dist = X*beta_start;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGamma = sortedabsdist(q,2)  
+    fprintf("Gamma recalculated from beta_start is %f\n", newGamma);
+    for i=1:m
+        if dist(i,1) > 0
+            eminus(i,1) = dist(i,1);
+        else
+            eplus(i,1) = -dist(i,1);
+        end
+    end
+    rel = absdist;
+    for i=1:q
+        z(sortedabsdist(i,1),1) = 1;
+        rel(sortedabsdist(i,1),1) = 0;
+    end
+    model.start = [newGamma; rel; eplus; eminus; z; beta_start];  
 end
 
 
@@ -187,7 +220,7 @@ disp("solving")
 result = gurobi(model, params);
 result.status
 if strcmp(result.status, 'OPTIMAL')
-    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
         beta_star = result.x((1+5*m+1):(1+5*m+n),1);
         z = result.x(1+4*m+1:1+4*m+m,1);
     else % MIO1
@@ -197,7 +230,7 @@ if strcmp(result.status, 'OPTIMAL')
 else 
     if result.mipgap ~= Inf
         fprintf("Using incumbent solution\n")
-        if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm")
+        if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
             beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
             z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
         else % MIO1
