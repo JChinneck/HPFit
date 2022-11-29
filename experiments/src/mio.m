@@ -137,7 +137,10 @@ for k=1:m
 end
 if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "alg3-mio1")
     disp("alg 3 start")
+    tStart = tic;
     [beta_start, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
+    alg3_time = toc(tStart)
+    timelimit = timelimit - alg3_time
     f_beta1
     disp("alg 3 end")
 end
@@ -210,6 +213,10 @@ params = struct();
 if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
     params.SolutionLimit = 1;
 end
+
+if timelimit < 60.0
+    timelimit = 60.0;
+end
 %params.OutputFlag = 0;
 if timelimit > 0
     params.TimeLimit = timelimit;
@@ -271,7 +278,7 @@ out_file = fopen(out_fname, "w");
 beta_star
  
 % filename, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - mio-bm or mio1,total squared error to hyperplane (along response or orthogonal, gurobi runtime, gamma 
-fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, result.runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar);
+fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, result.runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar,timelimit);
 
 fclose(out_file);
 return

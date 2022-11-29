@@ -66,7 +66,6 @@ function [beta_star, f_beta_star] = run_alg3(iteration, datafname,q, m_normal, d
 
 disp("running alg3")
 dep_var
-tic; % start the timer
 
 X = readtable(datafname);
 X = X{:,:}; % convert data table to an array
@@ -79,6 +78,7 @@ end
 [m,n] = size(X);  %get the new size of the dataset
 
 disp("alg 3 start")
+tStart = tic; % start the timer
 function [beta_star] = lad(X, dep_var) % LAD = least aboslute deviations = L1 regression
     [m,n] = size(X); 
     f_beta_star = inf;
@@ -269,6 +269,7 @@ if dep_var == true
     beta_star = [-1;beta_star]; % with a dependent variable, add the coefficient back on y
 end
 
+alg3_time = toc(tStart); % end time
 disp("alg 3 end")
 
 
@@ -295,7 +296,6 @@ out_file = fopen(out_fname, "w");
 
 %disp(result.status)
 beta_star
-alg3_time = toc; % end time
  
 % filename including path, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - alg3,total squared error to hyperplane (along response or orthogonal, gurobi runtime, gamma 
 fprintf(out_file, "%s,%d,%d,%d,%d,%d,alg3%s,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, init_method, tot_err, f_beta_star,alg3_time,alg3_lts);

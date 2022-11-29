@@ -52,6 +52,7 @@ out_fname = strcat(resloc, "/", formulation, "i", int2str(iteration), ".csv")
 disp(out_fname)
 out_file = fopen(out_fname, 'w');
 
+tStart = tic;
 if dep_var == true
     qparams.maxResid = -16;
     y = X(:,1); % first column is response
@@ -66,7 +67,10 @@ else
     cbq_beta = [-output.RHS; output.weights];
     cbq_beta = (cbq_beta/cbq_beta(1,1))*n
 end
-[beta_star, f_beta_star] =mio(iteration, datafname,q, cbq_beta, m_normal, dep_var, formulation, resloc, timelimit);
+cbq_time = toc(tStart);
+
+
+[beta_star, f_beta_star] =mio(iteration, datafname,q, cbq_beta, m_normal, dep_var, formulation, resloc, timelimit-cbq_time);
 
 
 fclose(out_file);

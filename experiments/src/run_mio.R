@@ -96,12 +96,14 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   cat("\n", i, "\n")
   X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE) # read data
 
+  lqs_time <- c(0,0,0)
   lqs_beta <- -10
   if (calc_lqs_beta == TRUE) {
       if (dep_var == TRUE) { # response is first variable
           if (q==1.0) {
             q<-nrow(X)-1
           }
+          lqs_time <- proc.time()
           my_lqs <- lqs(V1 ~ ., data=X, method="lqs", quantile=floor(q*nrow(X))) # fit LQS model for response; the first variable
           lqs_norm <- my_lqs$coefficients[2:length(my_lqs$coefficients)] # get coefficients but not intercept
           lqs_norm[is.na(lqs_norm)] <- 0.0
@@ -109,8 +111,10 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
           lqs_beta <- matrix(c(-1.0, lqs_intercept, lqs_norm),
                              nrow=length(lqs_norm)+2,
                              ncol=1) # beta_1 = -1 - the response
+          lqs_time <- proc.time() - lqs_time
       } else {
           lqs_dist_min <- 10^8
+          lqs_time <- proc.time()
           lqs_results <- lapply(1:n, fit_lqs, X, m, n, q)  # apply LQS with each variable 1...n as the response
           lqs_dists <- sapply(lqs_results, function(x) x$lqs_dist) # get all the distances
           lqs_dist <- min(lqs_dists) # get the best one
@@ -123,6 +127,7 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
                              nrow=length(lqs_norm)+1,
                              ncol=1) # put intercept and coefficients together
           lqs_beta <- (lqs_beta/lqs_beta[1,1])*n  # normalize so that beta_0 = n
+          lqs_time <- proc.time() - lqs_time
       }
   }
 
@@ -135,34 +140,34 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   if (formulation == "mio3" | formulation == "lqs-mio3" | formulation == "alg3-mio3") { # three-phase approach
     if (dep_var == TRUE) { # first variable is response
       cat("running mio3 ")
-      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ",-1)", sep="")) # dep_var = TRUE
+      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ",-1)", sep="")) # dep_var = TRUE
     } else { 
-      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit, ",-1)", sep="")) # dep_var = FALSE
+      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ",-1)", sep="")) # dep_var = FALSE
     }
      
   } else if (formulation == "cbmio3") {
     if (dep_var == TRUE) { # first variable is response
       cat("running cbmio3 ")
-      cat(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',", q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
-      print(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+      cat(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',", q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
+      print(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
       if (class(q) == "numeric") {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
       } else {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',",m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',",m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
       }
     } else {
       if (class(q) == "numeric") {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = FALSE
       } else {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = FALSE
       }
     }
   } else if (formulation == "alg3-mio-bm" | formulation == "alg3-mio1" | formulation == "lqs-mio-bm" | formulation == "lqs-mio1" | formulation == "mio-bm" | formulation == "mio1") { # MIO1 or MIO-BM
     if (dep_var == TRUE) { # first variable is response 
-      print(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) 
-      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
+      print(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) 
+      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
     } else {
-      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = FALSE
+      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = FALSE
     }
   } else if (formulation == "cbq-mio1" | formulation == "cbq-mio-bm") {
     if (dep_var == TRUE) {
