@@ -1,4 +1,4 @@
-% May 25, 2022
+% December 13, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -426,7 +426,7 @@ sortedMax = sort(outMeasure.max);
 changes = ischange(sortedMax,'linear');
 % Set initial defaults for the cutoff value. If there is no abrupt change
 % then the default cutoff values are used.
-if m/n < 2
+if m/n <= 2
     % Can't start at m/2 or we don't leave enough points for PCA to run
     istart = n + 1;
     cutoff = sortedMax(istart,1);
