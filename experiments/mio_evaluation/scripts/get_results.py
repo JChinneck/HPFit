@@ -12,6 +12,7 @@ folnames = ["olive", "bm", "rvd", "clustered_outliers_small", "bm_small"]
 
 for folname in folnames:
     results={}
+    print(folname)
     for fname in glob.glob(loc+"/"+experiment+"/"+folname+"/*.csv"):
         f=open(fname, "r")
         line=f.readline()

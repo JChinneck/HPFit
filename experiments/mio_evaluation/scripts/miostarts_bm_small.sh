@@ -2,16 +2,16 @@
 #shell for qsub to use
 #$ -S /bin/bash
 # name for the job on qstat
-#$ -N comparison
+#$ -N miostarts
 # tell SGE that it's an array and job numbers
-#$ -t 1-70:1
+#$ -t 1-100:1
 # tell SGE to run at most 3 jobs at once
 #$ -tc 3
 
-FOLNAME=bm # folder where data is
+FOLNAME=bm_small # folder where data is
 EXP=mio_evaluation # experiment
-JOBNAME=comparison # name of job on SGE
-TIMELIMIT=3600
+JOBNAME=miostarts # name of job on SGE
+TIMELIMIT=60
 Q=0.50
 DEP_VAR=TRUE
 

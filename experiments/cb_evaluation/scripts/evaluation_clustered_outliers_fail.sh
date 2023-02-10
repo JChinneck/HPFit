@@ -4,22 +4,22 @@
 # name for the job on qstat
 #$ -N evaluation
 # tell SGE that it's an array and job numbers
-#$ -t 1-6:1
+#$ -t 1-103:1
 # tell SGE to run at most 3 jobs at once
 #$ -tc 3
 
-FOLNAME=olive # folder where data is
+FOLNAME=clustered_outliers # folder where data is
 EXP=cb_evaluation # experiment
-JOBNAME=evaluation # name of job on SGE
+JOBNAME=evaluation # name of job on SGE and location of results
 TIMELIMIT=60 # used for CB-MIO3
-Q=0.50 # for methods that need a q, like lqs
-DEP_VAR=TRUE
+Q=0.50
+DEP_VAR=FALSE
 
 SRCLOC=$HOME/HPFit/experiments/src
 DATALOC=$HOME/HPFit/experiments/$EXP/data/$FOLNAME
 RESLOC=$HOME/HPFit/experiments/$EXP/results/$JOBNAME/$FOLNAME
 MOSEKLOC=$HOME/src/mosek/9.3/toolbox/r2015a
-SEEDFILE=$DATALOC/$FOLNAME.in
+SEEDFILE=$DATALOC/clustered_outliershbreg_fail.in
 mkdir -p $RESLOC # make folder for results
 mkdir -p $RESLOC/log # make folder for logs
 
@@ -33,7 +33,8 @@ echo "library(matlabr)" >> $RESLOC/hyper.$ID.in
 echo "options(matlab.path='/usr/local/MATLAB/R2018b/bin')" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/mpack.txt\")" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/run_competitors.R\")" >> $RESLOC/hyper.$ID.in
-echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+#echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+echo "no_hbreg(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 echo "run_alg3(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"$RESLOC\", \"$MOSEKLOC\", \"PCA\")" >> $RESLOC/hyper.$ID.in
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout

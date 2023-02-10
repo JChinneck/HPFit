@@ -4,16 +4,16 @@
 # name for the job on qstat
 #$ -N evaluation
 # tell SGE that it's an array and job numbers
-#$ -t 1-6:1
-# tell SGE to run at most 3 jobs at once
+#$ -t 1-100:1
+# tell SGE to run at most 3 job at once
 #$ -tc 3
 
-FOLNAME=olive # folder where data is
+FOLNAME=clustered_outliers_small # folder where data is
 EXP=cb_evaluation # experiment
 JOBNAME=evaluation # name of job on SGE
 TIMELIMIT=60 # used for CB-MIO3
-Q=0.50 # for methods that need a q, like lqs
-DEP_VAR=TRUE
+Q=0.50
+DEP_VAR=FALSE
 
 SRCLOC=$HOME/HPFit/experiments/src
 DATALOC=$HOME/HPFit/experiments/$EXP/data/$FOLNAME

@@ -2,18 +2,18 @@
 #shell for qsub to use
 #$ -S /bin/bash
 # name for the job on qstat
-#$ -N heuristics
+#$ -N miostarts
 # tell SGE that it's an array and job numbers
-#$ -t 1-100:1
-# tell SGE to run at most 5 jobs at once
-#$ -tc 5
+#$ -t 1-6:1
+# tell SGE to run at most 3 jobs at once
+#$ -tc 3
 
-FOLNAME=clustered_outliers_small # folder where data is
+FOLNAME=olive # folder where data is
 EXP=mio_evaluation # experiment
-JOBNAME=heuristics # name of job on SGE
+JOBNAME=miostarts # name of job on SGE
 TIMELIMIT=60
 Q=0.50
-DEP_VAR=FALSE
+DEP_VAR=TRUE
 
 SRCLOC=$HOME/HPFit/experiments/src
 DATALOC=$HOME/HPFit/experiments/$EXP/data/$FOLNAME
@@ -31,17 +31,13 @@ SEED=$(sed -n -e "$ID p" $SEEDFILE)
 echo "library(MASS)" > $RESLOC/hyper.$ID.in
 echo "library(matlabr)" >> $RESLOC/hyper.$ID.in
 echo "options(matlab.path='/usr/local/MATLAB/R2018b/bin')" >> $RESLOC/hyper.$ID.in
-echo "source(\"$SRCLOC/run_competitors.R\")" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/run_mio.R\")" >> $RESLOC/hyper.$ID.in
-echo "run_heuristics(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
-#echo "run_cbq(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
-#echo "run_alg3(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"$RESLOC\", \"$MOSEKLOC\", \"PCA\")" >> $RESLOC/hyper.$ID.in
-#echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio1\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
-#echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio-bm\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio1\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio-bm\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 #echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"alg3-mio-bm\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 #echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"alg3-mio1\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 #echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"lqs-mio1\", $TIMELIMIT, \"$RESLOC\", TRUE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
-echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"lqs-mio-bm\", $TIMELIMIT, \"$RESLOC\", TRUE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+#echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"lqs-mio-bm\", $TIMELIMIT, \"$RESLOC\", TRUE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 #echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"cbq-mio1\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 #echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"cbq-mio-bm\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 

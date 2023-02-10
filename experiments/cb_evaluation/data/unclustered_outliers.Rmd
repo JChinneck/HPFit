@@ -13,14 +13,6 @@ library(MASS)
 set.seed(123456)
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE}
-#library(knitr)
-#knit_hooks$set(webgl = hook_webgl)
-##cat('<script type="text/javascript">', readLines(system.file('WebGL', 
-##    'CanvasMatrix.js', package = 'rgl')), '</script>', sep = '\n')
-#hook_plot = knit_hooks$get('plot')
-#knit_hooks$set(plot = function(x, options) paste('\n', hook_plot(x, options), sep = ''))
-```
 
 Function for sum of squared distances of non-outlier points to a hyperplane.
 ```{r}
@@ -35,8 +27,6 @@ generate_data <- function(m,
                           n, 
                           prefix, 
                           iteration=0) {
-  #V <- runif(n=n*(n-1),min=-1, max=1)
-  #V <- matrix(V, ncol=n-1) # the columns of V are basis vectors for the hyperplane
   my_norm <- runif(n, min=-1, max=1)
   my_norm <- my_norm/sqrt(sum(my_norm*my_norm))
   V <- diag(n) - my_norm %*% t(my_norm)
@@ -44,7 +34,6 @@ generate_data <- function(m,
   A <- runif(n=m*(n-1), min=-100, max=100)
   A <- matrix(A, ncol=n-1) # the rows of A are the multipliers for each point
   beta <- runif(n, min=-100, max=100)  # beta is the offset from the origin.
-  #my_norm <- svd(V %*% t(A))$u[,n] # normal vector to hyperplane
   X <- V %*% t(A) + beta
   X <- t(X)
   print(m)
@@ -56,7 +45,6 @@ generate_data <- function(m,
   X <- t(apply(X, 1, function(x) {x + rnorm(n=1, mean=0, sd=1)*my_norm}))
 
   num_outliers <- sample(1:(m-1), size=1)  # outFrac is at most 0.5
-  #num_clust <- sample(1:min(10, num_outliers), size=1) # if num_clust > num_outliers, then some clusters won't have outliers and that is handled below
   num_clust <- num_outliers
   outlier_to_clust <- sample(1:num_clust, size=num_outliers, replace=FALSE) # set to FALSE so that there is one outlier per cluster
 
@@ -68,9 +56,7 @@ generate_data <- function(m,
     for (i in 1:num_clust) {
       distance_to_center <- runif(n=1,50,100)
       distances <- c(distances, distance_to_center)
-      outlier_centers[i,] <- runif(n=n-1, min=-100+distance_to_center, max=100-distance_to_center) # multipliers
-      outlier_centers[i, outlier_centers[i,] < 0] <- 100 + outlier_centers[i, outlier_centers[i,] < 0]
-      outlier_centers[i, outlier_centers[i,] > 0] <- 100 - outlier_centers[i, outlier_centers[i,] > 0]
+      outlier_centers[i,] <- runif(n=n-1, min=-100, max=100) # multipliers
     }
     outlier_centers <- V %*% t(outlier_centers) + beta  # point on hyperplane
     for (i in 1:num_clust) {
@@ -309,6 +295,7 @@ for (j in 125:249) {
   num_sets <- num_sets + 1
 }
 ```
+
 
 
 
