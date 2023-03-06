@@ -151,6 +151,10 @@ end
 
 newGammaHeur = -1.0 
 tsestarHeur = -1.0 
+newGamma60 = -1.0 
+tsestar60 = -1.0 
+newGamma3600 = -1.0 
+tsestar3600 = -1.0 
 if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") %MIO-BM
     rplus = zeros(m,1);
     rminus = zeros(m,1);
@@ -262,22 +266,27 @@ if strcmp(result.status, 'OPTIMAL')
         z = result.x(1+3*m+1:1+3*m+m,1);
     end
 else 
-    if result.mipgap ~= Inf
-        fprintf("Using incumbent solution\n")
-        if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
-            beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
-            z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
-        else % MIO1
-            beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
-            z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
-        end
-    else
-        fprintf("No solution available\n")
-        return
+    %if result.mipgap ~= Inf
+    fprintf("Using incumbent solution\n")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
+        beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
+        z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
+    else % MIO1
+        beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
+        z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
     end
+    %else
+    %    fprintf("No solution available\n")
+    %    beta_star = zeros(n,1);
+    %    %return
+    %end
 end
 f_beta_star = result.objval;
 %qth_residuals = [f_beta1 f_beta_star];
+
+if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
+    output_runtime = result.runtime;
+end
 
 num_outliers_in_q = sum(z((m_normal+1):m,1))
 
@@ -298,7 +307,7 @@ else % get orthogonal error
 end
 
 % get 60s solution to start 
-if strcmp(formulation, "mio-bm") | strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") %MIO-BM
+if strcmp(formulation, "mio-bm") | strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm-first") %MIO-BM
     rplus = zeros(m,1);
     rminus = zeros(m,1);
     mu = zeros(m,1);
@@ -327,7 +336,7 @@ if strcmp(formulation, "mio-bm") | strcmp(formulation, "alg3-mio-bm") | strcmp(f
         z(sortedabsdist(i,1),1) = 1;
     end
     model.start = [newGamma60; rplus; rminus; mu; mubar; z; beta_star];  
-elseif strcmp(formulation, "mio1") | strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") %MIO1
+elseif strcmp(formulation, "mio1") | strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "mio1-first") %MIO1
     eplus = zeros(m,1);
     eminus = zeros(m,1);
     rel = zeros(m,1);
@@ -367,24 +376,25 @@ if strcmp(result.status, 'OPTIMAL')
         z = result.x(1+3*m+1:1+3*m+m,1);
     end
 else 
-    if result.mipgap ~= Inf
-        fprintf("Using incumbent solution\n")
-        if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
-            beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
-            z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
-        else % MIO1
-            beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
-            z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
-        end
-    else
-        fprintf("No solution available\n")
-        return
+    %if result.mipgap ~= Inf
+    fprintf("Using incumbent solution\n")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
+        beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
+        z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
+    else % MIO1
+        beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
+        z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
     end
+    %else
+    %    fprintf("No solution available\n")
+    %    beta_star = zeros(n,1);
+    %    %return
+    %end
 end
-f_beta_star = result.objval;
 %qth_residuals = [f_beta1 f_beta_star];
 
 num_outliers_in_q = sum(z((m_normal+1):m,1))
+f_beta_star = result.objval;
 
 % get sum of squared error on non outliers
 dist = abs(X*beta_star); 
@@ -435,13 +445,20 @@ out_fname = strcat(resloc, "/", formulation,"i",int2str(iteration), ".csv")
 disp(out_fname)
 out_file = fopen(out_fname, "w");
 
+if ~(strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first"))
+    output_runtime = result.runtime;
+end
+
 %disp(result.status)
 beta_star
  
 % filename, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - mio-bm or mio1,total squared error to hyperplane (along response or orthogonal, gurobi runtime, gamma 
-fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, result.runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar3600,timelimit,newGammaHeur,tsestarHeur,newGamma60,tsestar60,newGamma3600,tsestar3600);
+newGamma60
+
+fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, output_runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar3600,timelimit,newGammaHeur,tsestarHeur,newGamma60,tsestar60,newGamma3600,tsestar3600);
 
 fclose(out_file);
+
 return
         
 end
