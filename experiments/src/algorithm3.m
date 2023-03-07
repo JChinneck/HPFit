@@ -54,8 +54,39 @@
 %                value of the q^th largest residual.
 
 function [beta_star, f_beta_star] = algorithm3(X,q,dep_var,init_method) % starts near the bottom; subfunctions defined at the top
+%Algorithm 3 starts here -------------------------------------------------
+%X  = X{:,:};
+[m,n] = size(X); % get the size of dataset; for datasets with no response, a column of 1s is included
+beta = lad(X, dep_var, init_method); % get LAD solution
+f_beta_star = inf;
+nu = 2;
 
-function [beta_star] = lad(X, dep_var) % LAD = least aboslute deviations = L1 regression
+for k=1:100 % perturb LAD solution 100 times
+    if dep_var == true
+        perturb = -nu + 2*nu*rand(n-1,1); % random number in [-nu, nu]
+    else
+        perturb = -nu + 2*nu*rand(n,1); % random number in [-nu, nu]
+    end
+    beta = beta + times(perturb, abs(beta));
+    [f_beta, beta] = algorithm2(X, beta, 500, q, dep_var); % use perturbed LAD as starting point for Algorithm 2
+    if f_beta < f_beta_star % if better, update
+        beta_star = beta;
+        f_beta_star = f_beta;
+    end
+end
+[beta_star, f_beta_star] = algorithm1(X, beta_star, q, dep_var); % use best Algorithm 2 solution as input to Algorithm 1
+
+if dep_var == true
+    beta_star = [-1;beta_star]; % with a dependent variable, add the coefficient back on y
+else
+    beta_star
+    beta_star = beta_star*((n-1)/beta_star(1,1))
+end
+
+
+end
+
+function [beta_star] = lad(X, dep_var, init_method) % LAD = least aboslute deviations = L1 regression
     [m,n] = size(X); 
     f_beta_star = inf;
 
@@ -97,7 +128,7 @@ function [beta_star] =solve_lp(X, beta, q, dep_var) % called by Algorithm 1
         abs_residuals = abs(residuals);
         [out,idx] = sort(abs_residuals); % sort residuals and get indexes
         w_star = zeros(m,1);
-        w_star(idx >= m-q+1,1) = 1; % get q largest residuals
+        w_star(idx(m-q+1:m),1) = 1; % get q largest residuals
         subg = transpose(X(:,2:n))*(times(-w_star,sign(residuals))); % calculate subgradient
         
         model.obj = [ (m-q+1); ones(m, 1); -subg ]; % theta; nu; beta
@@ -117,7 +148,7 @@ function [beta_star] =solve_lp(X, beta, q, dep_var) % called by Algorithm 1
         abs_residuals = abs(residuals);
         [out,idx] = sort(abs_residuals);
         w_star = zeros(m,1);
-        w_star(idx >= m-q+1,1) = 1; % get q largest residuals
+        w_star(idx(m-q+1:m),1) = 1; % get q largest residuals
         subg = transpose(X)*(times(-w_star,sign(residuals)));
         
         model.obj = [ (m-q+1); ones(m, 1); -subg ]; % theta; nu_i; beta
@@ -143,12 +174,12 @@ function [beta_kplus1, q_residual_k] = algorithm1(X, beta, q, dep_var) % sequent
     if dep_var == true
         residuals_k = abs(X(:,1) - X(:,2:n)*beta); % absolute value of response minus projection on hyperplane
         [out_k, idx_k] = sort(residuals_k);
-        q_residual_k = residuals_k(idx_k == q); % q^th largest absolute residual
+        q_residual_k = residuals_k(idx_k(q)); % q^th largest absolute residual
         while 0 < 1
             beta_kplus1 = solve_lp(X, beta, q, dep_var); % get new beta
             residuals_kplus1 = abs(X(:,1) - X(:,2:n)*beta_kplus1); % calculate new residuals
             [out_kplus1, idx_kplus1] = sort(residuals_kplus1); % sort residuals and get indexes
-            q_residual_kplus1 = residuals_kplus1(idx_kplus1==q); % q^th largest residual
+            q_residual_kplus1 = residuals_kplus1(idx_kplus1(q)); % q^th largest residual
             if abs(q_residual_k - q_residual_kplus1) <= Tol*q_residual_k % if converged, stop
                 return
             end
@@ -158,12 +189,12 @@ function [beta_kplus1, q_residual_k] = algorithm1(X, beta, q, dep_var) % sequent
     else % no dependent variable
         residuals_k = abs(X*beta); % absolute value of distance to hyperplane using elastic LP criterion
         [out_k, idx_k] = sort(residuals_k); % sort residuals and get indexes
-        q_residual_k = residuals_k(idx_k == q); % q^th largest residual
+        q_residual_k = residuals_k(idx_k(q)); % q^th largest residual
         while 0 < 1
             beta_kplus1 = solve_lp(X, beta, q, dep_var); % get new beta
             residuals_kplus1 = abs(X*beta_kplus1); % calculate new residuals
             [out_kplus1, idx_kplus1] = sort(residuals_kplus1); % sort new residuals
-            q_residual_kplus1 = residuals_kplus1(idx_kplus1==q); % q^th largest residual
+            q_residual_kplus1 = residuals_kplus1(idx_kplus1(q)); % q^th largest residual
             if abs(q_residual_k - q_residual_kplus1) <= Tol*q_residual_k % if converged, stop
                 return
             end
@@ -182,13 +213,14 @@ function [f_beta_star, beta_star] = algorithm2(X, beta, MaxIter, q, dep_var) % s
         residuals = X(:,1) - X(:,2:n)*beta_star; % residuals are response minus projections on hyperplane
         abs_residuals = abs(residuals);
         [out, idx] = sort(abs_residuals); % sort absolute residuals and get indexes
-        f_beta_star = abs_residuals(idx==q); % get q^th largest residual
+        f_beta_star = abs_residuals(idx(q)); % get q^th largest residual
         for k = 1:MaxIter
-            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx==q)))*transpose(X(idx==q,2:n)); % update beta
+            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx(q))))*transpose(X(idx(q),2:n)); % update beta
             residuals = X(:,1) - X(:,2:n)*beta_kplus1; % calculate new residuals
             abs_residuals = abs(residuals);
             [out, idx] = sort(abs_residuals); % sort residuals and get indexes
-            f_beta = abs_residuals(idx==q); % get q^th largest residual
+            f_beta = abs_residuals(idx(q)); % get q^th largest residual
+            sortedabsresid = sort(abs_residuals);
             if f_beta < f_beta_star % if the q^th largest is better, update the solution
                 f_beta_star = f_beta;
                 beta_star = beta_kplus1;
@@ -201,13 +233,13 @@ function [f_beta_star, beta_star] = algorithm2(X, beta, MaxIter, q, dep_var) % s
         residuals = X*beta_star; % calculate residuals using elastic LP criterion
         abs_residuals = abs(residuals);
         [out, idx] = sort(abs_residuals); % sort residuals and get indexes
-        f_beta_star = abs_residuals(idx==q); % get q^th largest residual
+        f_beta_star = abs_residuals(idx(q)); % get q^th largest residual
         for k = 1:MaxIter
-            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx==q)))*transpose(X(idx==q,:)); % update beta
+            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx(q))))*transpose(X(idx(q),:)); % update beta
             residuals = X*beta_kplus1; % calculate new residuals
             abs_residuals = abs(residuals);
             [out, idx] = sort(abs_residuals); % sort new residuals and get indexes
-            f_beta = abs_residuals(idx==q); % get q^th largest residual
+            f_beta = abs_residuals(idx(q)); % get q^th largest residual
             if f_beta < f_beta_star % if q^th largest is better, update
                 f_beta_star = f_beta;
                 beta_star = beta_kplus1;
@@ -217,32 +249,3 @@ function [f_beta_star, beta_star] = algorithm2(X, beta, MaxIter, q, dep_var) % s
     end
     return
 end
-
-%X  = X{:,:};
-[m,n] = size(X); % get the size of dataset; for datasets with no response, a column of 1s is included
-beta = lad(X, dep_var); % get LAD solution
-f_beta_star = inf;
-nu = 2;
-
-for k=1:100 % perturb LAD solution 100 times
-    if dep_var == true
-        perturb = -nu + 2*nu*rand(n-1,1); % random number in [-nu, nu]
-    else
-        perturb = -nu + 2*nu*rand(n,1); % random number in [-nu, nu]
-    end
-    beta = beta + times(perturb, abs(beta));
-    [f_beta, beta] = algorithm2(X, beta, 500, q, dep_var); % use perturbed LAD as starting point for Algorithm 2
-    if f_beta < f_beta_star % if better, update
-        beta_star = beta;
-        f_beta_star = f_beta;
-    end
-end
-[beta_star, f_beta_star] = algorithm1(X, beta_star, q, dep_var); % use best Algorithm 2 solution as input to Algorithm 1
-
-if dep_var == true
-    beta_star = [-1;beta_star]; % with a dependent variable, add the coefficient back on y
-end
-
-end
-
-

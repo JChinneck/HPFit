@@ -12,7 +12,7 @@ FOLNAME=olive # folder where data is
 EXP=cb_evaluation # experiment
 JOBNAME=evaluation # name of job on SGE
 TIMELIMIT=60 # used for CB-MIO3
-Q=0.50
+Q=0.50 # for methods that need a q, like lqs
 DEP_VAR=TRUE
 
 SRCLOC=$HOME/HPFit/experiments/src
@@ -34,10 +34,11 @@ echo "options(matlab.path='/usr/local/MATLAB/R2018b/bin')" >> $RESLOC/hyper.$ID.
 echo "source(\"$SRCLOC/mpack.txt\")" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/run_competitors.R\")" >> $RESLOC/hyper.$ID.in
 echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+echo "run_alg3(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"$RESLOC\", \"$MOSEKLOC\", \"PCA\")" >> $RESLOC/hyper.$ID.in
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
-#rm $RESLOC/hyper.$ID.in
-rm $RESLOC/$ID.Rout
+rm $RESLOC/hyper.$ID.in
+#rm $RESLOC/$ID.Rout
 rm $HOME/$JOBNAME.e*
 rm $HOME/$JOBNAME.o*

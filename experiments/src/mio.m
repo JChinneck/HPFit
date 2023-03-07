@@ -76,25 +76,25 @@ end
 
 
 % Set up the MIP
-if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
+if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
     model.obj = [1.0; zeros(2*m,1) ; zeros(m,1); zeros(m,1); zeros(m,1); zeros(n,1)]; % gamma ; rplus/rminus; mu; mubar; z; beta
     model.lb  = [zeros(1+5*m,1); -inf(n,1)];
     if dep_var == true % dependent variable - regression; first variable is response
         model.A   = [ 
-                  sparse(-ones(m,1)) speye(m) speye(m) -speye(m) speye(m) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % rplus + rminus - gamma = mubar - mu, for each point i
+                  sparse(-ones(m,1)) speye(m) speye(m) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % rplus + rminus - gamma = mubar - mu, for each point i
                   sparse(zeros(m,1)) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(X) ; % rplus - rminus = y-x^T beta, for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(ones(1,m)) sparse(zeros(1,n)) ; % sum of zs is q
-                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % mu <= gamma, for each point i
+                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,n))  ; % mu <= gamma, for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) 1.0 sparse(zeros(1,n-1))] ; % beta_1=-1
       
         model.rhs = [ zeros(m,1) ; zeros(m,1) ; q ; zeros(m,1) ; -1];
         %model.rhs = [ zeros(m,1) ; zeros(m,1) ; q ; zeros(m,1) ; ones(m,1) ; -1];
     else % no dependent variable
         model.A   = [ 
-                  sparse(-ones(m,1)) speye(m) speye(m) -speye(m) speye(m) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % rplus + rminus - gamma = mubar - mu, for each point i
-                  sparse(zeros(m,1)) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(X) ; % rplus - rminus = x^T beta, for each point i
+                  sparse(-ones(m,1)) speye(m) speye(m) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % rplus + rminus - gamma = mubar - mu, for each point i
+                  sparse(zeros(m,1)) speye(m) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(X) ; % rplus - rminus = -x^T beta, for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(ones(1,m)) sparse(zeros(1,n)) ; % sum of zs is q
-                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % mu <= gamma for each point i
+                  sparse(ones(m,1)) sparse(zeros(m,m)) sparse(zeros(m,m)) -speye(m) sparse(zeros(m,m)) sparse(zeros(m,m)) sparse(zeros(m,n)) ; % mu <= gamma for each point i
                   sparse(zeros(1,1)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) sparse(zeros(1,m)) 1.0 sparse(zeros(1,n-1)) ] ; % beta_0=n; n-1 because we have a column of 1s
 
         model.rhs = [ zeros(m,1) ; zeros(m,1) ; q ; zeros(m,1) ; n-1];
@@ -123,77 +123,170 @@ else % formulation is MIO1
     model.varnames = cellstr(['gamma' ; repmat('r',m, 1) + string(1:m)' ; repmat('eplus',m, 1) + string(1:m)' ; repmat('eminus',m, 1) + string(1:m)' ; repmat('z',m, 1) + string(1:m)' ; repmat('beta',n, 1) + string(1:n)']) 
 end
 for k=1:m
-    if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
         model.sos(k).type = 1;
         model.sos(k).index = [(1+2*m+m+k) (1+2*m+k)]'; % mubar, mu
         model.sos(m+k).type = 1;
         model.sos(m+k).index = [(1+k) (1+m+k)]'; % rplus, rminus
         model.sos(2*m+k).type = 1;
-        model.sos(2*m+k).index = [(1+2*m+2*m+k) (1+2*m+k)]'; % z, mu
+        model.sos(2*m+k).index = [(1+2*m+2*m+k) (1+2*m+m+k)]'; % z, mubar;  this is a correction from the paper.
     else % MIO1
         model.sos(k).type = 1;
         model.sos(k).index = [(1+k) (1+3*m+k)]'; % r, z
     end
 end
-disp("alg 3 start")
-[beta1, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
-beta1
-disp("alg 3 end")
-if strcmp(formulation, "mio-bm")
-    model.StartNumber = 0;
-    model.start = [nan; NaN(5*m,1);   beta1];  % from algorithm 3
-else %MIO1
-    model.StartNumber = 0;
-    model.start = [nan; NaN(4*m,1);   beta1];  % from algorithm 3
-
+if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "alg3-mio1")
+    disp("alg 3 start")
+    tStart = tic;
+    [beta_start, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
+    alg3_time = toc(tStart)
+    timelimit = timelimit - alg3_time
+    f_beta1
+    disp("alg 3 end")
 end
 
-if strcmp(formulation, "lqs-mio-bm")% if a solution given by R's LQS method is given
-    model.StartNumber = 1;
-    model.start = [nan; NaN(5*m,1) ; lqs_beta]; 
+if strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "cbq-mio-bm")
+    beta_start = lqs_beta;
 end
-if strcmp(formulation, "lqs-mio1")
-    model.StartNumber = 1;
-    model.start = [nan; NaN(4*m,1) ; lqs_beta]; 
+
+newGammaHeur = -1.0 
+tsestarHeur = -1.0 
+newGamma60 = -1.0 
+tsestar60 = -1.0 
+newGamma3600 = -1.0 
+tsestar3600 = -1.0 
+if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") %MIO-BM
+    rplus = zeros(m,1);
+    rminus = zeros(m,1);
+    mu = zeros(m,1);
+    mubar = zeros(m,1);
+    z = zeros(m,1);
+    model.StartNumber = 0;
+    dist = X*beta_start;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGammaHeur = sortedabsdist(q,2)
+    fprintf("Gamma recalculated from beta_start is %f\n", newGammaHeur);
+    for i=1:m
+        if dist(i,1) > 0
+            rminus(i,1) = dist(i,1);
+        else
+            rplus(i,1) = -dist(i,1);
+        end
+        if rplus(i,1) + rminus(i,1) - newGammaHeur > 0
+            mubar(i,1) = rplus(i,1) + rminus(i,1) - newGammaHeur;
+        else
+            mu(i,1) = -rplus(i,1) - rminus(i,1) + newGammaHeur;
+        end
+    end
+    for i=1:q
+        z(sortedabsdist(i,1),1) = 1;
+    end
+    model.start = [newGammaHeur; rplus; rminus; mu; mubar; z; beta_start];  
+    if dep_var == true % get error along response direction, recall that beta_1 = -1
+        tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
+        sorteddist = sort(dist(:,1).*dist(:,1));
+        tsestarHeur = sum(sorteddist(1:m_normal))
+        tse = sum(sorteddist(1:q))
+    else % get orthogonal error
+        gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
+        edist = abs(dist/gradLen);
+        sortededist = sort(edist(:,1).*edist(:,1));
+        tsestarHeur = sum(sortededist(1:m_normal))
+        tse = sum(sortededist(1:q))
+        tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
+    end
+elseif strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") %MIO1
+    eplus = zeros(m,1);
+    eminus = zeros(m,1);
+    rel = zeros(m,1);
+    z = zeros(m,1);
+    model.StartNumber = 0;
+    dist = X*beta_start;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGammaHeur = sortedabsdist(q,2)  
+    fprintf("Gamma recalculated from beta_start is %f\n", newGammaHeur);
+    for i=1:m
+        if dist(i,1) > 0
+            eminus(i,1) = dist(i,1);
+        else
+            eplus(i,1) = -dist(i,1);
+        end
+    end
+    rel = absdist;
+    for i=1:q
+        z(sortedabsdist(i,1),1) = 1;
+        rel(sortedabsdist(i,1),1) = 0;
+    end
+    model.start = [newGammaHeur; rel; eplus; eminus; z; beta_start];  
+    if dep_var == true % get error along response direction, recall that beta_1 = -1
+        tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
+        sorteddist = sort(dist(:,1).*dist(:,1));
+        tsestarHeur = sum(sorteddist(1:m_normal))
+        tse = sum(sorteddist(1:q))
+    else % get orthogonal error
+        gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
+        edist = abs(dist/gradLen);
+        sortededist = sort(edist(:,1).*edist(:,1));
+        tsestarHeur = sum(sortededist(1:m_normal))
+        tse = sum(sortededist(1:q))
+        tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
+    end
 end
+
 
 model.modelsense = 'min';
 %gurobi_write(model, 'mio.lp');
 params = struct();
+if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
+    params.SolutionLimit = 1;
+end
+
 %params.OutputFlag = 0;
-if timelimit > 0
+if timelimit >= 0.0
     params.TimeLimit = timelimit;
+else
+    params.TimeLimit = 0.0;
 end
 params.Symmetry = 2;
 params.Threads = 1
-disp("solving")
+
+disp("solving 60 s")
 result = gurobi(model, params);
 result.status
 if strcmp(result.status, 'OPTIMAL')
-    if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
         beta_star = result.x((1+5*m+1):(1+5*m+n),1);
-        z = result.x(1+4*m+1:1+4*m+m,1)
+        z = result.x(1+4*m+1:1+4*m+m,1);
     else % MIO1
         beta_star = result.x((1+4*m+1):(1+4*m+n),1);
-        z = result.x(1+3*m+1:1+3*m+m,1)
+        z = result.x(1+3*m+1:1+3*m+m,1);
     end
 else 
-    if result.mipgap ~= Inf
-        fprintf("Using incumbent solution\n")
-        if strcmp(formulation, "mio-bm") | strcmp(formulation, "lqs-mio-bm")
-            beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
-            z = result.pool(1).xn(1+4*m+1:1+4*m+m,1)
-        else % MIO1
-            beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
-            z = result.pool(1).xn(1+3*m+1:1+3*m+m,1)
-        end
-    else
-        fprintf("No solution available\n")
-        return
+    %if result.mipgap ~= Inf
+    fprintf("Using incumbent solution\n")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
+        beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
+        z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
+    else % MIO1
+        beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
+        z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
     end
+    %else
+    %    fprintf("No solution available\n")
+    %    beta_star = zeros(n,1);
+    %    %return
+    %end
 end
 f_beta_star = result.objval;
-qth_residuals = [f_beta1 f_beta_star];
+%qth_residuals = [f_beta1 f_beta_star];
+
+if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
+    output_runtime = result.runtime;
+end
 
 num_outliers_in_q = sum(z((m_normal+1):m,1))
 
@@ -202,28 +295,170 @@ dist = abs(X*beta_star);
 if dep_var == true % get error along response direction, recall that beta_1 = -1
     tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
     sorteddist = sort(dist(:,1).*dist(:,1));
-    tsestar = sum(sorteddist(1:m_normal))
+    tsestar60 = sum(sorteddist(1:m_normal))
     tse = sum(sorteddist(1:q))
 else % get orthogonal error
     gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
     edist = abs(dist/gradLen);
     sortededist = sort(edist(:,1).*edist(:,1));
-    tsestar = sum(sortededist(1:m_normal))
+    tsestar60 = sum(sortededist(1:m_normal))
     tse = sum(sortededist(1:q))
     tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
+end
+
+% get 60s solution to start 
+if strcmp(formulation, "mio-bm") | strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm-first") %MIO-BM
+    rplus = zeros(m,1);
+    rminus = zeros(m,1);
+    mu = zeros(m,1);
+    mubar = zeros(m,1);
+    z = zeros(m,1);
+    model.StartNumber = 0;
+    dist = X*beta_star;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGamma60 = sortedabsdist(q,2)
+    fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
+    for i=1:m
+        if dist(i,1) > 0
+            rminus(i,1) = dist(i,1);
+        else
+            rplus(i,1) = -dist(i,1);
+        end
+        if rplus(i,1) + rminus(i,1) - newGamma60 > 0
+            mubar(i,1) = rplus(i,1) + rminus(i,1) - newGamma60;
+        else
+            mu(i,1) = -rplus(i,1) - rminus(i,1) + newGamma60;
+        end
+    end
+    for i=1:q
+        z(sortedabsdist(i,1),1) = 1;
+    end
+    model.start = [newGamma60; rplus; rminus; mu; mubar; z; beta_star];  
+elseif strcmp(formulation, "mio1") | strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "mio1-first") %MIO1
+    eplus = zeros(m,1);
+    eminus = zeros(m,1);
+    rel = zeros(m,1);
+    z = zeros(m,1);
+    model.StartNumber = 0;
+    dist = X*beta_star;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGamma60 = sortedabsdist(q,2)  
+    fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
+    for i=1:m
+        if dist(i,1) > 0
+            eminus(i,1) = dist(i,1);
+        else
+            eplus(i,1) = -dist(i,1);
+        end
+    end
+    rel = absdist;
+    for i=1:q
+        z(sortedabsdist(i,1),1) = 1;
+        rel(sortedabsdist(i,1),1) = 0;
+    end
+    model.start = [newGamma60; rel; eplus; eminus; z; beta_star];  
+end
+
+disp("solving 60 m")
+params.TimeLimit = 3600.0 + timelimit - 60.0;  %timelimit has 60s for first MIO built in, minus heuristic; timelimit may be negative if heuristic took longer than 60s
+result = gurobi(model, params);
+
+if strcmp(result.status, 'OPTIMAL')
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
+        beta_star = result.x((1+5*m+1):(1+5*m+n),1);
+        z = result.x(1+4*m+1:1+4*m+m,1);
+    else % MIO1
+        beta_star = result.x((1+4*m+1):(1+4*m+n),1);
+        z = result.x(1+3*m+1:1+3*m+m,1);
+    end
+else 
+    %if result.mipgap ~= Inf
+    fprintf("Using incumbent solution\n")
+    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
+        beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
+        z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
+    else % MIO1
+        beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
+        z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
+    end
+    %else
+    %    fprintf("No solution available\n")
+    %    beta_star = zeros(n,1);
+    %    %return
+    %end
+end
+%qth_residuals = [f_beta1 f_beta_star];
+
+num_outliers_in_q = sum(z((m_normal+1):m,1))
+f_beta_star = result.objval;
+
+% get sum of squared error on non outliers
+dist = abs(X*beta_star); 
+if dep_var == true % get error along response direction, recall that beta_1 = -1
+    tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
+    sorteddist = sort(dist(:,1).*dist(:,1));
+    tsestar3600 = sum(sorteddist(1:m_normal))
+    tse = sum(sorteddist(1:q))
+else % get orthogonal error
+    gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
+    edist = abs(dist/gradLen);
+    sortededist = sort(edist(:,1).*edist(:,1));
+    tsestar3600 = sum(sortededist(1:m_normal))
+    tse = sum(sortededist(1:q))
+    tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
+end
+
+% calculate gamma for 3600 solution
+
+if strcmp(formulation, "mio-bm") | strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") %MIO-BM
+    rplus = zeros(m,1);
+    rminus = zeros(m,1);
+    mu = zeros(m,1);
+    mubar = zeros(m,1);
+    z = zeros(m,1);
+    model.StartNumber = 0;
+    dist = X*beta_star;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGamma3600 = sortedabsdist(q,2)
+    fprintf("Gamma recalculated from beta_start is %f\n", newGamma3600);
+elseif strcmp(formulation, "mio1") | strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") %MIO1
+    eplus = zeros(m,1);
+    eminus = zeros(m,1);
+    rel = zeros(m,1);
+    z = zeros(m,1);
+    model.StartNumber = 0;
+    dist = X*beta_star;
+    absdist = abs(dist);
+    sortedabsdist = [(1:m)',absdist];
+    sortedabsdist = sortrows(sortedabsdist,2);
+    newGamma3600 = sortedabsdist(q,2)  
+    fprintf("Gamma recalculated from beta_start is %f\n", newGamma3600);
 end
 
 out_fname = strcat(resloc, "/", formulation,"i",int2str(iteration), ".csv")
 disp(out_fname)
 out_file = fopen(out_fname, "w");
 
+if ~(strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first"))
+    output_runtime = result.runtime;
+end
+
 %disp(result.status)
 beta_star
  
 % filename, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - mio-bm or mio1,total squared error to hyperplane (along response or orthogonal, gurobi runtime, gamma 
-fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, result.runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar);
+newGamma60
+
+fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, output_runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar3600,timelimit,newGammaHeur,tsestarHeur,newGamma60,tsestar60,newGamma3600,tsestar3600);
 
 fclose(out_file);
+
 return
         
 end
