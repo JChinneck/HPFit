@@ -20,6 +20,7 @@ for folname in folnames:
         #print(fname)
         if not dataset in results:
             results[dataset] = {}
+        print(dataset) 
         formulation=line1[6]
         if formulation=="mio-bm":
             results[dataset]["i"]=int(line1[1])
@@ -137,54 +138,54 @@ writer.close()
 #writer.close()
 #
 
-#experiment="comparison"
-#writer = pd.ExcelWriter(loc + "/" + experiment + "_tse.xlsx", mode="w")
-#
-#folnames = ["olive", "bm", "rvd", "clustered_outliers_small", "bm_small", "bm-like", "rvd-like"]
-#
-#for folname in folnames:
-#    results={}
-#    for fname in glob.glob(loc+"/"+experiment+"/"+folname+"/*.csv"):
-#        f=open(fname, "r")
-#        line=f.readline()
-#        line1=line.split(",") 
-#        dataset=line1[0]
-#        if not dataset in results:
-#            results[dataset] = {}
-#        try:
-#            formulation=line1[6]
-#            if formulation=="mio1": 
-#                results[dataset]["i"]=int(line1[1])
-#                results[dataset]["m"]=int(line1[2])
-#                results[dataset]["n"]=int(line1[3])
-#                results[dataset]["m_normal"]=int(line1[4])
-#                results[dataset]["q"]=int(line1[5])
-#                #results[dataset][formulation + " Dnon"]=float(line1[7])
-#                results[dataset][formulation + " runtime"]=float(line1[8])
-#                results[dataset][formulation + " status"]=line1[9]
-#                results[dataset][formulation + " gamma"]=float(line1[10])
-#                results[dataset][formulation + " bestbound"]=float(line1[11])
-#                results[dataset][formulation + " tse"]=float(line1[13])
-#                results[dataset][formulation + " tsestar"]=float(line1[14])
-#                results[dataset][formulation + " timelimit"]=float(line1[15])
-#
-#        except:
-#            print(fname)
-#
-#
-#    results_df = pd.DataFrame(results).transpose()
-#    print(results_df.columns)
-#    results_df = results_df[["i","m","n","m_normal","q",
-#                             "mio1 bestbound",
-#                             "mio1 status",
-#                             "mio1 runtime",
-#                             "mio1 timelimit",
-#                             "mio1 tsestar",
-#                             "mio1 tse",
-#                             "mio1 gamma"
-#                             ]]
-#    results_df.sort_values(by=["i"], inplace=True)
-#    results_df.to_excel(writer, sheet_name=folname, float_format="%f")
-#
-#writer.close()
+experiment="miostarts"
+writer = pd.ExcelWriter(loc + "/" + experiment + "_tse.xlsx", mode="w")
+
+folnames = ["olive", "bm", "rvd", "clustered_outliers_small", "bm_small", "bm-like", "rvd-like"]
+
+for folname in folnames:
+    results={}
+    for fname in glob.glob(loc+"/"+experiment+"/"+folname+"/mio1*.csv"):
+        f=open(fname, "r")
+        line=f.readline()
+        line1=line.split(",") 
+        dataset=line1[0]
+        if not dataset in results:
+            results[dataset] = {}
+        try:
+            formulation=line1[6]
+            if formulation=="mio1": 
+                results[dataset]["i"]=int(line1[1])
+                results[dataset]["m"]=int(line1[2])
+                results[dataset]["n"]=int(line1[3])
+                results[dataset]["m_normal"]=int(line1[4])
+                results[dataset]["q"]=int(line1[5])
+                #results[dataset][formulation + " Dnon"]=float(line1[7])
+                results[dataset][formulation + " runtime"]=float(line1[8])
+                results[dataset][formulation + " status"]=line1[9]
+                results[dataset][formulation + " gamma3600"]=float(line1[20])
+                results[dataset][formulation + " bestbound"]=float(line1[11])
+                #results[dataset][formulation + " tse"]=float(line1[13])
+                results[dataset][formulation + " tsestar3600"]=float(line1[21])
+                results[dataset][formulation + " timelimit"]=float(line1[15])
+
+        except:
+            print(fname)
+
+
+    results_df = pd.DataFrame(results).transpose()
+    print(results_df.columns)
+    results_df = results_df[["i","m","n","m_normal","q",
+                             "mio1 bestbound",
+                             "mio1 status",
+                             "mio1 runtime",
+                             "mio1 timelimit",
+                             "mio1 tsestar3600",
+                             #"mio1 tse",
+                             "mio1 gamma3600"
+                             ]]
+    results_df.sort_values(by=["i"], inplace=True)
+    results_df.to_excel(writer, sheet_name=folname, float_format="%f")
+
+writer.close()
     
