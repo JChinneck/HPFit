@@ -6,8 +6,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn import metrics
 loc="/home/jpbrooks/HPFit/experiments/cb_evaluation/results"
 
-folnames = ["bm-like", "bm-nox", "clustered_outliers", "olive", "rvd-like", "unclustered_outliers", "bm", "rvd", "clustered_outliers_small"]
-reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd"]
+folnames = ["bm-like", "bm-nox", "clustered_outliers", "olive", "rvd-like", "unclustered_outliers", "bm", "rvd", "clustered_outliers_small", "bm_small"]
+reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small"]
 gen_names = ["clustered_outliers", "unclustered_outliers", "clustered_outliers_small"]
 experiments=["evaluation"]
 for experiment in experiments:
