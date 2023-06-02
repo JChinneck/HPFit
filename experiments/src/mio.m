@@ -248,119 +248,117 @@ end
 %params.OutputFlag = 0;
 if timelimit >= 0.0
     params.TimeLimit = timelimit;
-else
-    params.TimeLimit = 0.0;
-end
-params.Symmetry = 2;
-params.Threads = 1
-
-disp("solving 60 s")
-result = gurobi(model, params);
-result.status
-if strcmp(result.status, 'OPTIMAL')
-    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
-        beta_star = result.x((1+5*m+1):(1+5*m+n),1);
-        z = result.x(1+4*m+1:1+4*m+m,1);
-    else % MIO1
-        beta_star = result.x((1+4*m+1):(1+4*m+n),1);
-        z = result.x(1+3*m+1:1+3*m+m,1);
-    end
-else 
-    %if result.mipgap ~= Inf
-    fprintf("Using incumbent solution\n")
-    if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
-        beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
-        z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
-    else % MIO1
-        beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
-        z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
-    end
-    %else
-    %    fprintf("No solution available\n")
-    %    beta_star = zeros(n,1);
-    %    %return
-    %end
-end
-f_beta_star = result.objval;
-%qth_residuals = [f_beta1 f_beta_star];
-
-if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
-    output_runtime = result.runtime;
-end
-
-num_outliers_in_q = sum(z((m_normal+1):m,1))
-
-% get sum of squared error on non outliers
-dist = abs(X*beta_star); 
-if dep_var == true % get error along response direction, recall that beta_1 = -1
-    tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
-    sorteddist = sort(dist(:,1).*dist(:,1));
-    tsestar60 = sum(sorteddist(1:m_normal))
-    tse = sum(sorteddist(1:q))
-else % get orthogonal error
-    gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
-    edist = abs(dist/gradLen);
-    sortededist = sort(edist(:,1).*edist(:,1));
-    tsestar60 = sum(sortededist(1:m_normal))
-    tse = sum(sortededist(1:q))
-    tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
-end
-
-% get 60s solution to start 
-if strcmp(formulation, "mio-bm") | strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm-first") %MIO-BM
-    rplus = zeros(m,1);
-    rminus = zeros(m,1);
-    mu = zeros(m,1);
-    mubar = zeros(m,1);
-    z = zeros(m,1);
-    model.StartNumber = 0;
-    dist = X*beta_star;
-    absdist = abs(dist);
-    sortedabsdist = [(1:m)',absdist];
-    sortedabsdist = sortrows(sortedabsdist,2);
-    newGamma60 = sortedabsdist(q,2)
-    fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
-    for i=1:m
-        if dist(i,1) > 0
-            rminus(i,1) = dist(i,1);
-        else
-            rplus(i,1) = -dist(i,1);
+    params.Symmetry = 2;
+    params.Threads = 1
+    
+    disp("solving 60 s")
+    result = gurobi(model, params);
+    result.status
+    if strcmp(result.status, 'OPTIMAL')
+        if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
+            beta_star = result.x((1+5*m+1):(1+5*m+n),1);
+            z = result.x(1+4*m+1:1+4*m+m,1);
+        else % MIO1
+            beta_star = result.x((1+4*m+1):(1+4*m+n),1);
+            z = result.x(1+3*m+1:1+3*m+m,1);
         end
-        if rplus(i,1) + rminus(i,1) - newGamma60 > 0
-            mubar(i,1) = rplus(i,1) + rminus(i,1) - newGamma60;
-        else
-            mu(i,1) = -rplus(i,1) - rminus(i,1) + newGamma60;
+    else 
+        %if result.mipgap ~= Inf
+        fprintf("Using incumbent solution\n")
+        if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
+            beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
+            z = result.pool(1).xn(1+4*m+1:1+4*m+m,1);
+        else % MIO1
+            beta_star = result.pool(1).xn((1+4*m+1):(1+4*m+n),1);
+            z = result.pool(1).xn(1+3*m+1:1+3*m+m,1);
         end
+        %else
+        %    fprintf("No solution available\n")
+        %    beta_star = zeros(n,1);
+        %    %return
+        %end
     end
-    for i=1:q
-        z(sortedabsdist(i,1),1) = 1;
+    f_beta_star = result.objval;
+    %qth_residuals = [f_beta1 f_beta_star];
+    
+    if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
+        output_runtime = result.runtime;
     end
-    model.start = [newGamma60; rplus; rminus; mu; mubar; z; beta_star];  
-elseif strcmp(formulation, "mio1") | strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "mio1-first") %MIO1
-    eplus = zeros(m,1);
-    eminus = zeros(m,1);
-    rel = zeros(m,1);
-    z = zeros(m,1);
-    model.StartNumber = 0;
-    dist = X*beta_star;
-    absdist = abs(dist);
-    sortedabsdist = [(1:m)',absdist];
-    sortedabsdist = sortrows(sortedabsdist,2);
-    newGamma60 = sortedabsdist(q,2)  
-    fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
-    for i=1:m
-        if dist(i,1) > 0
-            eminus(i,1) = dist(i,1);
-        else
-            eplus(i,1) = -dist(i,1);
+    
+    num_outliers_in_q = sum(z((m_normal+1):m,1))
+    
+    % get sum of squared error on non outliers
+    dist = abs(X*beta_star); 
+    if dep_var == true % get error along response direction, recall that beta_1 = -1
+        tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
+        sorteddist = sort(dist(:,1).*dist(:,1));
+        tsestar60 = sum(sorteddist(1:m_normal))
+        tse = sum(sorteddist(1:q))
+    else % get orthogonal error
+        gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
+        edist = abs(dist/gradLen);
+        sortededist = sort(edist(:,1).*edist(:,1));
+        tsestar60 = sum(sortededist(1:m_normal))
+        tse = sum(sortededist(1:q))
+        tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
+    end
+    
+    % get 60s solution to start 
+    if strcmp(formulation, "mio-bm") | strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm-first") %MIO-BM
+        rplus = zeros(m,1);
+        rminus = zeros(m,1);
+        mu = zeros(m,1);
+        mubar = zeros(m,1);
+        z = zeros(m,1);
+        model.StartNumber = 0;
+        dist = X*beta_star;
+        absdist = abs(dist);
+        sortedabsdist = [(1:m)',absdist];
+        sortedabsdist = sortrows(sortedabsdist,2);
+        newGamma60 = sortedabsdist(q,2)
+        fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
+        for i=1:m
+            if dist(i,1) > 0
+                rminus(i,1) = dist(i,1);
+            else
+                rplus(i,1) = -dist(i,1);
+            end
+            if rplus(i,1) + rminus(i,1) - newGamma60 > 0
+                mubar(i,1) = rplus(i,1) + rminus(i,1) - newGamma60;
+            else
+                mu(i,1) = -rplus(i,1) - rminus(i,1) + newGamma60;
+            end
         end
+        for i=1:q
+            z(sortedabsdist(i,1),1) = 1;
+        end
+        model.start = [newGamma60; rplus; rminus; mu; mubar; z; beta_star];  
+    elseif strcmp(formulation, "mio1") | strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "mio1-first") %MIO1
+        eplus = zeros(m,1);
+        eminus = zeros(m,1);
+        rel = zeros(m,1);
+        z = zeros(m,1);
+        model.StartNumber = 0;
+        dist = X*beta_star;
+        absdist = abs(dist);
+        sortedabsdist = [(1:m)',absdist];
+        sortedabsdist = sortrows(sortedabsdist,2);
+        newGamma60 = sortedabsdist(q,2)  
+        fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
+        for i=1:m
+            if dist(i,1) > 0
+                eminus(i,1) = dist(i,1);
+            else
+                eplus(i,1) = -dist(i,1);
+            end
+        end
+        rel = absdist;
+        for i=1:q
+            z(sortedabsdist(i,1),1) = 1;
+            rel(sortedabsdist(i,1),1) = 0;
+        end
+        model.start = [newGamma60; rel; eplus; eminus; z; beta_star];  
     end
-    rel = absdist;
-    for i=1:q
-        z(sortedabsdist(i,1),1) = 1;
-        rel(sortedabsdist(i,1),1) = 0;
-    end
-    model.start = [newGamma60; rel; eplus; eminus; z; beta_star];  
 end
 
 disp("solving 60 m")
