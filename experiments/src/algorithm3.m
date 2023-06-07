@@ -1,25 +1,28 @@
+% Algorithm 3 is proposed in Bertsimas and Mazumder (2014).  The 
+% result is used as a warm start for a mixed-integer optimization
+% approach.  
 % algorithm3() is a composite heuristic for fitting a hyperplane to 
-% minimize the q^th residual.  This version is called by mio.m and
-% mio3.m.  To run algorithm 3 by itself, use run_alg3.m
+% minimize the q^th residual.  This version is called by mio.m. 
+% To run algorithm 3 by itself, use run_alg3.m
 % Purpose: to find the best fitting hyperplance to a set of input 
-% data, where best fitting means that the absoluet value of the 
+% data, where best fitting means that the absolute value of the 
 % q^th residual is minimized.  Bertsimas and Mazumder (2014) call
 % this Least Quantile of Squres (LQS) even though there is no square.
 % which can be affected by outliers.
 % Algorithm 3 begins by running L1 regression (LAD).  If no response
-% variable is specified, we allow each variable to serve as response
-% and retain the best (in terms of the q^th residual).  The result is
+% variable is specified, we use PCA. 
+% The result is
 % perturbed 100 times and sent to Algorithm 2 for 500 iterations. 
 % Algorithm 2 is a subdifferential-based algorithm for LQS.  The best
 % solution is passed to Algorithm 1.  Algorithm 1 is a sequential 
 % linear optimization algorithm for LQS.
-% Algorithm 3 is proposed in Bertsimas and Mazumder (2014).  The 
-% result is used as a warm start for a mixed-integer optimization
-% approach.  
 % Algorithms 1 and 2 have been adapted to the case when no response
 % variable is specified. 
-%
+
 % Main options: 
+% q: 
+%   - the order statistic used to evaluate the fit of a hyperplane. 
+%     The fit is determined by the q^th largest residual.
 % dep_var:
 %   - true: a dependent variable is specified, as in ordinary
 %           regression.  A residual is measured as the absolute
@@ -31,9 +34,6 @@
 %            measure which is the absolute difference between 
 %            beta^T x (including beta_0=n) and zero.
 % 
-% q: 
-%   - the order statistic used to evaluate the fit of a hyperplane. 
-%     The fit is determined by the q^th largest residual.
 % NOTES:
 % - when a dependent variable is specified, the corresponding 
 %   coefficient is set to -1.  When one is not specified, the 
@@ -100,8 +100,8 @@ function [beta_star] = lad(X, dep_var, init_method) % LAD = least aboslute devia
        params = struct();
        %params.OutputFlag = 0;
        result = gurobi(model, params);
-       beta_star = result.x(1:(n-1)); % coeffients for variables except for response, which is -1
-       f_beta_star = result.objval; 
+       beta_star = result.x(1:(n-1)); % coefficients for variables except for response, which is -1 (we don't store the response coefficient)
+       f_beta_star = result.objval;
     else % no dependent variable
         if init_method == "LP"  % elastic LP
             model.obj = [zeros(n-1,1) ; ones(2*m,1) ]; % beta (intercept fixed at n), eplus, eminus
@@ -124,16 +124,16 @@ end
 function [beta_star] =solve_lp(X, beta, q, dep_var) % called by Algorithm 1
     [m,n] = size(X); 
     if dep_var == true % first variable is response
-        residuals = X(:,1) - X(:,2:n)*beta; % residuals are response minus projections on hyperplane
+        residuals = X(:,1) - X(:,2:n)*beta; % residuals are responses minus projections on hyperplane
         abs_residuals = abs(residuals);
-        [out,idx] = sort(abs_residuals); % sort residuals and get indexes
+        [out,idx] = sort(abs_residuals); % sort absolute residuals and get indexes
         w_star = zeros(m,1);
         w_star(idx(m-q+1:m),1) = 1; % get q largest residuals
         subg = transpose(X(:,2:n))*(times(-w_star,sign(residuals))); % calculate subgradient
         
         model.obj = [ (m-q+1); ones(m, 1); -subg ]; % theta; nu; beta
         model.lb  = [ -inf ; zeros(m,1); -inf(n-1,1) ];
-        model.A   = [ sparse(ones(m, 1)) speye(m) sparse(X(:,2:n));  % theta + nu_i >= y_i - x_i^T beta , for each point i
+        model.A   = [ sparse(ones(m, 1)) speye(m) sparse(X(:,2:n));  % theta + nu_i >= y_i - x_i^T beta, for each point i
             sparse(ones(m,1)) speye(m) sparse(-X(:,2:n)); % theta + nu_i >= -y_i+x_i^T beta for each point i
             (m-q+1) sparse(ones(1,m)) -subg' ]; % objective is at least 0
         model.rhs = [X(:,1); -X(:,1); 0.0];  % +/- y_i

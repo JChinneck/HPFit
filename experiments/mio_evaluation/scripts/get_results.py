@@ -8,7 +8,7 @@ loc="/home/jpbrooks/HPFit/experiments/mio_evaluation/results"
 experiment="miostarts"
 writer = pd.ExcelWriter(loc + "/" + experiment + ".xlsx", mode="w")
 
-folnames = ["olive", "bm", "rvd", "clustered_outliers_small", "bm_small"]
+folnames = ["olive", "bm", "rvd", "clustered_outliers_small", "bm_small", "bm-like", "rvd-like"]
 
 for folname in folnames:
     results={}

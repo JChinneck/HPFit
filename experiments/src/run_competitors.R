@@ -1,10 +1,21 @@
 # get_dists() is a function for calling a number of competing methods
-# for fitting a hyperplane.  no_hbreg() is for datasets where hbreg
+# for fitting a hyperplane.  The goal is to compare methods for 
+# minimizing the trimmed sum of errors.  
+# no_hbreg() is for datasets where hbreg
 # or other methods from Olive (2017) fail - it runs the other 
 # methods.  For some of the more time consuming methods and for
 # general hyperplanes, there are limits based on the number of
 # dimensions n hard coded in the functions based on observations 
 # from experiments.    
+# Other supporting functions include:
+# fit_lm()    fit an OLS model with a specified variable as dependent
+# fit_hbreg() fit hbreg, arob, bb with a specified variable as 
+#             dependent
+# fit_lts()   fit an lts model with a specified variable as dependent
+# fit_lqs()   fit an lqs model with a specified variable as dependent
+# lqs_gamma() fit an lqs model with a specified variable as dependent
+# hyper_dist_sq() get the distance to a hyperplane
+
 # Purpose: to apply competing methods of fitting a hyperplane to 
 # data that are contaminated by outliers. 
 # Methods:
@@ -104,7 +115,7 @@
 #          response variable is specified.  Options are "PCA" for 
 #          principal component analysis and "LP" for elastic LP
 #     - outputs: see run_alg3.m
-# - get_dists: run lm, hbreg, arob, bb, lts, lqs, RBM, RBM-MIO3, 
+# - get_dists: run lm, hbreg, arob, bb, lts, lqs, CB, 
 #              and algorithm 3 on a dataset
 # 
 #     - inputs: 
@@ -117,7 +128,7 @@
 #        - mosekloc: location of MOSEK binary 
 #     - outputs: results are written to various files in resloc 
 #                folder
-# - no_hbreg: run lm, lts, lqs, RBM, RBM-MIO3,and algorithm 3 on a 
+# - no_hbreg: run lm, lts, lqs, CB, and algorithm 3 on a 
 #             dataset
 #     - inputs: 
 #        - dataloc: folder containing the data file
@@ -556,8 +567,7 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
   add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
   print(paste("addpath('", srcloc, "');", sep=""))
 
-  # need to run RBM and get RBM start
-  # run rbm when dep_var is FALSE
+  # run CB and alg3
   if (dep_var == TRUE) {
     run_matlab_code(paste(add_path, " ", "run_cb(", i, ",'",dataloc, "/", fname,"',",q,",",m, ",true,'", resloc, "')", sep="")) # dep_var = TRUE
     run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "','PCA')", sep=""))
@@ -592,8 +602,7 @@ no_hbreg <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mose
   add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
   print(paste("addpath('", srcloc, "');", sep=""))
 
-  # need to run RBM and get RBM start
-  # run rbm when dep_var is FALSE
+  # CB and alg3
   if (dep_var == TRUE) {
     run_matlab_code(paste(add_path, " ", "run_cb(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "')", sep=""))
     run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "','PCA')", sep=""))
@@ -604,31 +613,6 @@ no_hbreg <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mose
 
 }
 
-run_cb <- function(dataloc, srcloc, fname, q, dep_var, resloc, mosekloc) {
-  print("srcloc")
-  print(srcloc)
-  
-  my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
-  my_regmatch <- regmatches(fname, my_regexec)
-  m <- as.numeric(my_regmatch[[1]][2])
-  n <- as.numeric(my_regmatch[[1]][3])
-  i <- as.numeric(my_regmatch[[1]][4])
-  cat("\n", i, "\n")
-
-  X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
-  q <- floor(q*nrow(X))
-  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
-  print(paste("addpath('", srcloc, "');", sep=""))
-
-  # need to run RBM and get RBM start
-  # run rbm when dep_var is FALSE
-  if (dep_var == TRUE) {
-    run_matlab_code(paste(add_path, " ", "run_cb(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", resloc, "')", sep=""))
-  } else {
-    run_matlab_code(paste(add_path, " ", "run_cb(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",false,'", resloc, "')", sep=""))
-  }
-}
-
 
 ## -----------------------------------------------------------------------------------------------------
 hyper_dist_sq <- function(w,b,x) {
@@ -636,127 +620,4 @@ hyper_dist_sq <- function(w,b,x) {
 }
 
 
-run_heuristics <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mosekloc) {
-  #loc <- 'vary_everything'
-  #fname <- 'm102n47m_outliers5num_clust1same_sideFALSEoutlier_dist1000i848.csv'
-  #fname <- "m650n10m_outliers350i0.csv"
-  #loc <- 'rd'
-  #library(MASS)
-  #source("../2021_02_hyper_data/olive/mpack.txt")
-  #q <- 0.64
-  print("srcloc")
-  print(srcloc)
-  
-  my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
-  my_regmatch <- regmatches(fname, my_regexec)
-  m <- as.numeric(my_regmatch[[1]][2])
-  n <- as.numeric(my_regmatch[[1]][3])
-  i <- as.numeric(my_regmatch[[1]][4])
-  cat("\n", i, "\n")
-  X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
-  if (dep_var == TRUE) {
 
-      lqs_time <- proc.time() 
-      my_lqs <- lqs(V1 ~ ., data=X, method="lqs", quantile=floor(q*m)) 
-      lqs_norm <- my_lqs$coefficients[2:length(my_lqs$coefficients)]
-      lqs_res <- X[,1] - as.matrix(X[,2:n]) %*% lqs_norm - my_lqs$coefficients[1]
-      lqs_dist <- sum(lqs_res[1:m]^2)
-      lqs_rq <- quantile(abs(lqs_res), q)
-      lqs_beta <- matrix(c(-1.0, my_lqs$coefficients),
-                          nrow=length(lqs_norm)+2,
-                          ncol=1) # beta_1 = -1 - the response
-      lqs_lts <- sum(sort(lqs_res^2)[1:m])
-      lqs_time <- proc.time() - lqs_time
-
-      lqs_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "lqs", lqs_dist, lqs_rq, lqs_time[1], lqs_time[2], lqs_time[3], lqs_lts, sep=",")
-      write(lqs_out, file=paste(resloc, "/lqsi", i, ".csv", sep=""), ncol=length(lqs_out))
-  } else {
-      lqs_time <- proc.time() 
-      lqs_results <- lapply(1:n, lqs_gamma, X, m, n, q)
-      lqs_dists <- sapply(lqs_results, function(x) x$lqs_dist)
-      lqs_dist <- min(lqs_dists)
-      lqs_norms <- sapply(lqs_results, function(x) x$lqs_norm)
-      lqs_intercepts <- sapply(lqs_results, function(x) x$lqs_intercept)
-      lqs_norm <- lqs_norms[,which(lqs_dists == min(lqs_dists))]
-      lqs_intercept <- lqs_intercepts[which(lqs_dists == min(lqs_dists))]
-      lqs_rqs <- sapply(lqs_results, function(x) x$lqs_rq)
-      lqs_rq <- lqs_rqs[which(lqs_dists == min(lqs_dists))]
-
-      lqs_beta <- matrix(c(lqs_intercept, lqs_norm),
-                         nrow=length(lqs_norm)+1,
-                         ncol=1)
-      lqs_beta <- (lqs_beta/lqs_beta[1,1])*n  # normalize so that beta_0 = n
-      #lqs_beta <- lqs_beta[,1]
-      lqs_ltss <- sapply(lqs_results, function(x) x$lqs_lts)
-      lqs_lts <- lqs_ltss[which(lqs_dists == min(lqs_dists))]
-      lqs_time <- proc.time() - lqs_time
-      
-      print(resloc)
-
-      lqs_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "lqs", lqs_dist, lqs_rq, lqs_time[1], lqs_time[2], lqs_time[3], lqs_lts, sep=",")
-      write(lqs_out, file=paste(resloc, "/lqsi", i, ".csv", sep=""))
-  } 
-  print("lqs_beta")
-  print(lqs_beta)
-  make_lqs_beta <- rmat_to_matlab_mat(lqs_beta, matname="lqs_beta")
-  
-#  write(c(lm_rq, hbreg_rq, arob_rq, bb_rq, lts_rq, lqs_rq), file=paste(loc,"/",fname,"rq", sep=""),ncolumns=6)
-
-  q <- floor(q*nrow(X))
-  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
-  print(paste("addpath('", srcloc, "');", sep=""))
-
-  if (dep_var == TRUE) {
-    dep_var_matlab <- "true" 
-  } else{
-    dep_var_matlab <- "false"
-  }
-  run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",", dep_var_matlab,",'", resloc, "','PCA')", sep=""))
-  run_matlab_code(paste(add_path, " ", "run_cbq(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",",dep_var_matlab,",'", resloc, "')", sep=""))
-  run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",",dep_var_matlab,",'", "mio1-first", "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
-  run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",",dep_var_matlab,",'", "mio-bm-first", "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
-    
-
-  #write(c(lm_norm, lm_intercept), file=paste(loc,"/hp/",fname,"hp", sep=""),ncolumns=n+1)
-  #write(c(hbreg_norm, hbreg_intercept), file=paste(loc,"/hp/",fname,"hp", sep=""),ncolumns=n+1, append=TRUE)
-  #write(c(arob_norm, arob_intercept), file=paste(loc,"/hp/",fname,"hp", sep=""),ncolumns=n+1, append=TRUE)
-  #write(c(bb_norm, bb_intercept), file=paste(loc,"/hp/",fname,"hp", sep=""),ncolumns=n+1, append=TRUE)
-  #write(c(lts_norm, lts_intercept), file=paste(loc,"/hp/",fname,"hp", sep=""),ncolumns=n+1, append=TRUE)
-  #write(c(lqs_norm, lqs_intercept), file=paste(loc,"/hp/",fname,"hp", sep=""),ncolumns=n+1, append=TRUE)
-
-}
-
-# can be deleted
-run_cbq <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mosekloc) {
-  #loc <- 'vary_everything'
-  #fname <- 'm102n47m_outliers5num_clust1same_sideFALSEoutlier_dist1000i848.csv'
-  #fname <- "m650n10m_outliers350i0.csv"
-  #loc <- 'rd'
-  #library(MASS)
-  #source("../2021_02_hyper_data/olive/mpack.txt")
-  #q <- 0.64
-  print("srcloc")
-  print(srcloc)
-  
-  my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
-  my_regmatch <- regmatches(fname, my_regexec)
-  m <- as.numeric(my_regmatch[[1]][2])
-  n <- as.numeric(my_regmatch[[1]][3])
-  i <- as.numeric(my_regmatch[[1]][4])
-  cat("\n", i, "\n")
-  X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
-  
-#  write(c(lm_rq, hbreg_rq, arob_rq, bb_rq, lts_rq, lqs_rq), file=paste(loc,"/",fname,"rq", sep=""),ncolumns=6)
-
-  q <- floor(q*nrow(X))
-  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
-  print(paste("addpath('", srcloc, "');", sep=""))
-
-  if (dep_var == TRUE) {
-    dep_var_matlab <- "true" 
-  } else{
-    dep_var_matlab <- "false"
-  }
-  run_matlab_code(paste(add_path, " ", "run_cbq(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",",dep_var_matlab,",'", resloc, "')", sep=""))
-    
-}

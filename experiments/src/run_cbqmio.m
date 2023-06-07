@@ -1,5 +1,7 @@
-% run_cbmio3() calls one of CBMIOreg.m or CBMIOgen.m depending on
-% whether there is a dependent variable or not.
+% run_cbqmio() calls one of CBqreg.m or CBqgen.m depending on
+% whether there is a dependent variable or not, then calls mio.m.
+% Uses the CB algorithms as a warmstart for MIO for minimizing the
+% qth largest residual.
 %
 % Main versions and options:
 % dep_var:
@@ -18,14 +20,7 @@
 % - when a dependent variable is specified, the corresponding 
 %   coefficient is set to -1.  When one is not specified, the 
 %   intercept is set to n.
-% - a result datafile is created containing the data file with 
-% bnd2,  gurobi runtime, gamma, 
-% TSEstar after CB, TSE after CB, gamma after CB
-% TSEstar after MIO, TSE after MIO, gamma after MIO
-% TSEstar after PCA on MIO, TSE after PCA on MIO, gamma after PCA on MIO
-% TSEstar after PCA on MIO, TSE after PCA on MIO, gamma after PCA on MIO
-% TSEstar after final PCA, TSE after final PCA, gamma after final PCA
-% MIO time,  CB time, total time
+% - a result datafile is created by mio.m
 %
 % INPUTS:
 % - options mentioned above
@@ -57,13 +52,13 @@ if dep_var == true
     qparams.maxResid = -16;
     y = X(:,1); % first column is response
     A = X(:,2:n);
-    [output, inc] = CBqreg(y, A, qparams)
+    [output, inc] = CBqreg(y, A, qparams) % regression version
     output.w
     cbq_beta = [-1.0;  output.w0; output.w];
     cbq_beta
 else 
     qparams.maxDist = -16;
-    [output, inc] = CBqgen(X, qparams)
+    [output, inc] = CBqgen(X, qparams) % general version
     cbq_beta = [-output.RHS; output.weights];
     cbq_beta = (cbq_beta/cbq_beta(1,1))*n
 end

@@ -1,6 +1,7 @@
 % run_cb() calls CBreg.m or CBgen.m for fitting hyperplanes
-
-
+% see those files for more information on the CB algorithms
+%  This algorithm is to run the CB algorithms as a method for
+% minimizing TSE.
 % Main options: 
 % q: 
 %   - the order statistic used to evaluate the fit of a hyperplane. 
@@ -8,7 +9,7 @@
 % dep_var:
 %   - true: a dependent variable is specified, as in ordinary
 %           regression.  A residual is measured as the squared
-%           difference between the reponse value and the 
+%           difference between the response value and the 
 %           vertical projection of the point on the fitted hyperplane
 %   - false: no dependent variable is specified. 
 %            A residual is measured using the elastic LP criterion,

@@ -1,0 +1,26 @@
+run_mio.R: for comparing methods on minimizing the q^th largest error. 
+           Calls mio.m and run_cbqmio.m.
+
+run_competitors.R: for comparing methods on minimizing the trimmed sum of errors.
+             Calls run_alg3.m and run_cb.m.
+
+mio.m: MIO methods for minimiing the q^th smallest error.  Calls algorithm3.m.
+
+run_cbqmio.m: Calls CBq methods and then runs MIO.  Calls CBqreg.m, CBqgen.m, and mio.m.
+
+algorithm3.m: Runs Algorithm 3 as a starting point for MIO.  Calls getPCAHP.m.
+
+getPCAHP.m: Gets the PCA hyperplane.
+
+run_alg3.m: Runs algorithm 3 as a standalone method.  Calls getPCAHP.m.
+
+run_cb.m: Calls CB functions.  Calls CBreg.m and CBgen.m.
+
+CBreg.m: Runs CB for a regression hyperplane.  
+
+CBgen.m: Runs CB for a general hyperplane.  Calls getPCAHP.m.
+
+
+
+
+
