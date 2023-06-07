@@ -1,31 +1,44 @@
-# The main function is run_mio() that calls one of three methods in
+# The main function is run_mio() that calls one of two methods in
 # MATLAB for minimizing the q^th absolute residual.  The methods are:
 # MIO-BM from Bertsimas and Mazumder (2014), MIO1, an improved
-# formulation developed by JWC, and MIO3, a three-phase approach 
-# that uses MIO1, PCA, and re-instatement of points.  MIO-BM and 
-# MIO1 are implemented in mio.m.  MIO3 is in mio3.m.  All three use
-# mixed-integer optimization.  
+# formulation developed by JWC.  Supporting functions are 
+# hyper_dist_sq() for calculating the distance to a hyperplane and
+# fit_lqs() which fits a hyperplane using a specified variable as 
+# the dependent variable.
+# MIO-BM and MIO1 are implemented in mio.m.  
 #
 # Main version and options:
 # dep_var:
 #   - TRUE: a dependent variable is specified, as in ordinary 
 #           regression.  A residual is measured as the absolute 
-#           difference between the reponse value and the 
+#           difference between the response value and the 
 #           vertical projection of the point on the fitted hyperplane
 #   - FALSE: no dependent is specified. The intercept term is 
 #            fixed to n, the original number of variables in the
 #            dataset.  In the end, a residual is measured as the  
 #            distance of a point to its orthogonal projection.
-# q: 
-#   - the percentile used to evaluate the fit of a hyperplane in
-#     in the MIO1 and MIO-BM and phase 1 MIO3 formulations
-#   - for CB-MIO3, q = 0 will use the outFinder q
-#   - for CB-MIO3, q = "qout" will use the number of outliers on CB 
-#     exit
+# q: the percentile used to evaluate the fit of a hyperplane in
+#     in the MIO1 and MIO-BM formulations
 # formulation:
 #   - mio-bm: use the model proposed by Bertsimas and Mazumder (2014)
 #   - mio1: use JWC's compact MIO model.
-#   - mio3: use the three phase approach.
+#   - alg3-mio-bm: mio-bm but with Algorithm 3 of Bertsimas and 
+#                  Mazumder (2014) to generate an initial solution
+#   - alg3-mio1: mio1 but with Algorithm 3 of Bertsimas and 
+#                Mazumder (2014) to generate an initial solution
+#   - lqs-mio-bm: mio-bm but with lqs in R to generate an initial 
+#                 solution
+#   - lqs-mio1: mio1 but with lqs in R to generate an initial 
+#               solution
+#   - cbq-mio-bm: mio-bm but with CBq to generate an initial 
+#                 solution
+#   - cbq-mio1: mio1 but with CBq in R to generate an initial 
+#               solution
+#   - mio-bm-first: take the first feasible solution discovered using 
+#                   mio-bm 
+#   - mio1-first: take the first feasible solution discovered using 
+#                   mio1 
+ 
 #
 # calc_lqs_beta: 
 #   - TRUE: use R's implementation of LQS to generate a warmstart
@@ -34,18 +47,19 @@
 #   - FALSE: do not generate a warmstart using LQS.
 #
 # NOTES:
-# - when a dep_var=TRUE, the response coefficient is -1.  When one is
+# - when dep_var=TRUE, the response coefficient is -1.  When one is
 #   not specified, the coefficients are normalized so that the 
 #   intercept is n (beta_0 + beta^T x = 0).
-# - mio.m and mio3.m create output files
+# - mio.m create output files
 #
 # INPUTS:
 # - options mentioned above
 # - dataloc: folder containing data file
-# - srcloc: folder containing mio.m and mio3.m
+# - srcloc: folder containing mio.m
 # - fname: data file name
 # - timelimit: timelimit for the MIP solver
 # - resloc: folder for the output 
+# - mosekloc: location of MOSEK files ($HOME/src/mosek/9.3/toolbox/r2015a)
 
 
 # function for calculating the squared distance of a point to a
@@ -137,39 +151,14 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   make_lqs_beta <- rmat_to_matlab_mat(lqs_beta, matname="lqs_beta") # create the warm start from LQS
   #add_path <- paste("addpath('", srcloc, "');", sep="") 
   add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="") # add the path to the MATLAB files and MOSEK
-  if (formulation == "mio3" | formulation == "lqs-mio3" | formulation == "alg3-mio3") { # three-phase approach
-    if (dep_var == TRUE) { # first variable is response
-      cat("running mio3 ")
-      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ",-1)", sep="")) # dep_var = TRUE
-    } else { 
-      run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio3(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ",-1)", sep="")) # dep_var = FALSE
-    }
-     
-  } else if (formulation == "cbmio3") {
-    if (dep_var == TRUE) { # first variable is response
-      cat("running cbmio3 ")
-      cat(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',", q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
-      print(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
-      if (class(q) == "numeric") {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",",m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
-      } else {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',",m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
-      }
-    } else {
-      if (class(q) == "numeric") {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"',",-q,",", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = FALSE
-      } else {
-        run_matlab_code(paste(add_path, " ", "run_cbmio3(", i, ",'",dataloc, "/", fname,"','qout',", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = FALSE
-      }
-    }
-  } else if (formulation == "alg3-mio-bm" | formulation == "alg3-mio1" | formulation == "lqs-mio-bm" | formulation == "lqs-mio1" | formulation == "mio-bm" | formulation == "mio1" | formulation == "mio1-first" | formulation == "mio-bm-first") { # MIO1 or MIO-BM
+  if (formulation == "alg3-mio-bm" | formulation == "alg3-mio1" | formulation == "lqs-mio-bm" | formulation == "lqs-mio1" | formulation == "mio-bm" | formulation == "mio1" | formulation == "mio1-first" | formulation == "mio-bm-first") { # use the lqs solution from above or mio.m will call algorithm3.  The time used for lqs is subtracted from the time limit specified.
     if (dep_var == TRUE) { # first variable is response 
       print(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) 
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = TRUE
     } else {
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",false,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) # dep_var = FALSE
     }
-  } else if (formulation == "cbq-mio1" | formulation == "cbq-mio-bm") {
+  } else if (formulation == "cbq-mio1" | formulation == "cbq-mio-bm") { # call run_cbqmio() in run_cbqmio.m
     if (dep_var == TRUE) {
       run_matlab_code(paste(add_path, " ", make_lqs_beta, " ", "run_cbqmio(", i, ",'",dataloc, "/", fname,"',",q,",", m, ",true,'", formulation, "','", resloc, "',", timelimit, ")", sep="")) # dep_var = TRUE
     } else{

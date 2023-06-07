@@ -8,6 +8,10 @@
 % each formulation, there are two versions: 1) a dependent variable is
 % specified (like the original published version) and 2) no dependent
 % variable is specified.  
+% mio() is called by run_mio.R and run_cbqmio.m.
+% The MIP solver is run for 60 seconds minus the warm start time and
+% the best solution is reported.  Then the MIP solver is run for 
+% additional time so that the total time is 3600 seconds.
 %
 % Main versions and options:
 % formulation:
@@ -15,12 +19,22 @@
 %             Bertsimas and Mazumder (2014).  Warm start with alg3.
 %   - mio1: an equivalent but more compact formualtion developed by
 %           JC.  Warm start with alg3.
-%   - lqs-mio-bm: mio-bm warmstarted with LQS.
-%   - lqs-mio1: mio1 warmstarted with LQS.
+%   - lqs-mio-bm: mio-bm warmstarted with LQS.  LQS is run in R.
+%   - lqs-mio1: mio1 warmstarted with LQS.  LQS is run in R.
+%   - alg3-mio-bm: mio-bm warmstarted with Algorithm 3 from Bertsimas
+%                  and Mazumder (2014).  mio() calls algorithm3.m.
+%   - alg3-mio1: mio1 warmstarted with Algorithm 3 from Bertsimas
+%                and Mazumder (2014).  mio() calls algorithm3.m.
+%   - cbq-mio-bm: mio-bm warmstarted with CBq created by JC.  mio()
+%                 is called by run_cbqmio.m.
+%   - cbq-mio1: mio1 warmstarted with CBq created by JC. mio() is 
+%               is called by run_cbqmio.m.
+%   - mio-bm-first: take the first feasible solution for mio-bm.
+%   - mio1-first: take the first feasible solution for mio1.
 % dep_var:
 %   - true: a dependent variable is specified, as in ordinary 
 %           regression.  A residual is measured as the absolute 
-%           difference between the reponse value and the 
+%           difference between the response value and the 
 %           vertical projection of the point on the fitted hyperplane
 %   - false: no dependent is specified. The intercept term is 
 %            fixed to n, the original number of variables in the
@@ -37,18 +51,25 @@
 %   path, iteration number, number of rows, number of variables, 
 %   number of non-outliers, q, formulation, total squared error, 
 %   MIP runtime, MIP status, gamma, best MIP bound, number of outliers
-%   identified as one of the q smallest by best MIP feasible solution.
+%   identified as one of the q smallest by best MIP feasible solution,
+%   trimmed squared error (TSE) for the q smallest residuals, TSE for 
+%   m_normal residuals after 1 hour, time limit used for the solver,
+%   gamma obtained by using the beta from the warm start, TSE for 
+%   m_normal residuals for warm start, gamma obtained after 60s of MIO
+%   TSE for m_normal after 60s of MIO, gamma obtained after 3600s, TSE
+%   for m_normal after 3600s.
 % 
 % INPUTS:
 % - options mentioned above
 % - iteration: iteration number.  Used in the output filename.
 % - datafname: full path to data file.
 % - lqs_beta: an initial solution generated using LQS as implemented
-%             in R. If -10, not lqs_beta provided.
+%             in R or CBq. 
 % - m_normal: number of non-outlier rows of data.  After that they are
 %             outliers.
 % - resloc: path to folder where output file will reside.
-% - timelimit: time limit for MIP solver.
+% - timelimit: time limit for MIP solver.  If alg3 is used as a warm 
+%              start, then that time is subtracted.  
 %
 % OUTPUTS:
 % - beta_star: the coefficients of the best-fit hyperplane.  When 
@@ -140,13 +161,13 @@ if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "alg3-mio1")
     tStart = tic;
     [beta_start, f_beta1] = algorithm3(X, q, dep_var, "PCA"); % algorithm 3 is given by Bertsimas and Mazumder as a way to derive initial solutions
     alg3_time = toc(tStart)
-    timelimit = timelimit - alg3_time
-    f_beta1
+    timelimit = timelimit - alg3_time % subjtract alg_3 time from solver time
+    f_beta1 % print gamma from alg3
     disp("alg 3 end")
 end
 
 if strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "cbq-mio-bm")
-    beta_start = lqs_beta;
+    beta_start = lqs_beta; % if lqs or cbq is used as a warmstart, it is passed as lqs_beta
 end
 
 newGammaHeur = -1.0 
@@ -155,6 +176,7 @@ newGamma60 = -1.0
 tsestar60 = -1.0 
 newGamma3600 = -1.0 
 tsestar3600 = -1.0 
+% calculate values for all variables based on the warm start gamma
 if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "cbq-mio-bm") %MIO-BM
     rplus = zeros(m,1);
     rminus = zeros(m,1);
@@ -163,38 +185,38 @@ if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strc
     z = zeros(m,1);
     model.StartNumber = 0;
     dist = X*beta_start;
-    absdist = abs(dist);
+    absdist = abs(dist); 
     sortedabsdist = [(1:m)',absdist];
     sortedabsdist = sortrows(sortedabsdist,2);
-    newGammaHeur = sortedabsdist(q,2)
+    newGammaHeur = sortedabsdist(q,2)  % gamma from warmstart
     fprintf("Gamma recalculated from beta_start is %f\n", newGammaHeur);
-    for i=1:m
+    for i=1:m  % calculate rminus and rplus variable values
         if dist(i,1) > 0
             rminus(i,1) = dist(i,1);
         else
             rplus(i,1) = -dist(i,1);
         end
-        if rplus(i,1) + rminus(i,1) - newGammaHeur > 0
+        if rplus(i,1) + rminus(i,1) - newGammaHeur > 0  % calculate mubar and mu values
             mubar(i,1) = rplus(i,1) + rminus(i,1) - newGammaHeur;
         else
             mu(i,1) = -rplus(i,1) - rminus(i,1) + newGammaHeur;
         end
     end
     for i=1:q
-        z(sortedabsdist(i,1),1) = 1;
+        z(sortedabsdist(i,1),1) = 1;  % identify which variables are selected as inliers
     end
-    model.start = [newGammaHeur; rplus; rminus; mu; mubar; z; beta_start];  
+    model.start = [newGammaHeur; rplus; rminus; mu; mubar; z; beta_start];  % specify starting solution for MIP
     if dep_var == true % get error along response direction, recall that beta_1 = -1
         tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
         sorteddist = sort(dist(:,1).*dist(:,1));
-        tsestarHeur = sum(sorteddist(1:m_normal))
-        tse = sum(sorteddist(1:q))
+        tsestarHeur = sum(sorteddist(1:m_normal)) % TSEstar is based on m_normal, which we usually don't know
+        tse = sum(sorteddist(1:q)) % TSE is based on q, which we usually set to 0.5
     else % get orthogonal error
         gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
         edist = abs(dist/gradLen);
         sortededist = sort(edist(:,1).*edist(:,1));
-        tsestarHeur = sum(sortededist(1:m_normal))
-        tse = sum(sortededist(1:q))
+        tsestarHeur = sum(sortededist(1:m_normal)) % TSEstar is based on m_normal, which we usually don't know
+        tse = sum(sortededist(1:q)) % TSE is based on q, which we usually set to 0.5
         tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
     end
 elseif strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") %MIO1
@@ -209,8 +231,8 @@ elseif strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strc
     sortedabsdist = sortrows(sortedabsdist,2);
     newGammaHeur = sortedabsdist(q,2)  
     fprintf("Gamma recalculated from beta_start is %f\n", newGammaHeur);
-    for i=1:m
-        if dist(i,1) > 0
+    for i=1:m % calculate eminus and eplus values
+        if dist(i,1) > 0 
             eminus(i,1) = dist(i,1);
         else
             eplus(i,1) = -dist(i,1);
@@ -218,21 +240,21 @@ elseif strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strc
     end
     rel = absdist;
     for i=1:q
-        z(sortedabsdist(i,1),1) = 1;
-        rel(sortedabsdist(i,1),1) = 0;
+        z(sortedabsdist(i,1),1) = 1; % specify inliers
+        rel(sortedabsdist(i,1),1) = 0; 
     end
-    model.start = [newGammaHeur; rel; eplus; eminus; z; beta_start];  
+    model.start = [newGammaHeur; rel; eplus; eminus; z; beta_start];   % specify initial solution
     if dep_var == true % get error along response direction, recall that beta_1 = -1
         tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
         sorteddist = sort(dist(:,1).*dist(:,1));
-        tsestarHeur = sum(sorteddist(1:m_normal))
-        tse = sum(sorteddist(1:q))
+        tsestarHeur = sum(sorteddist(1:m_normal)) % TSE* is for m_normal, which we usually don't know
+        tse = sum(sorteddist(1:q)) % TSE is for q, which is usually 0.5
     else % get orthogonal error
         gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
         edist = abs(dist/gradLen);
         sortededist = sort(edist(:,1).*edist(:,1));
-        tsestarHeur = sum(sortededist(1:m_normal))
-        tse = sum(sortededist(1:q))
+        tsestarHeur = sum(sortededist(1:m_normal)) % TSE* is for m_normal, which we usually don't know
+        tse = sum(sortededist(1:q)) % TSE is for q, which is usually 0.5
         tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
     end
 end
@@ -242,11 +264,11 @@ model.modelsense = 'min';
 %gurobi_write(model, 'mio.lp');
 params = struct();
 if strcmp(formulation, "mio-bm-first") | strcmp(formulation, "mio1-first")
-    params.SolutionLimit = 1;
+    params.SolutionLimit = 1;  % take the first solution
 end
 
 %params.OutputFlag = 0;
-if timelimit >= 0.0
+if timelimit >= 0.0 % if the warm start took less than 60 seconds, then run MIO for the remaining time.
     params.TimeLimit = timelimit;
     params.Symmetry = 2;
     params.Threads = 1
@@ -254,7 +276,7 @@ if timelimit >= 0.0
     disp("solving 60 s")
     result = gurobi(model, params);
     result.status
-    if strcmp(result.status, 'OPTIMAL')
+    if strcmp(result.status, 'OPTIMAL')  % get the optimal solution from Gurobi
         if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
             beta_star = result.x((1+5*m+1):(1+5*m+n),1);
             z = result.x(1+4*m+1:1+4*m+m,1);
@@ -262,8 +284,7 @@ if timelimit >= 0.0
             beta_star = result.x((1+4*m+1):(1+4*m+n),1);
             z = result.x(1+3*m+1:1+3*m+m,1);
         end
-    else 
-        %if result.mipgap ~= Inf
+    else  % get the best known solution
         fprintf("Using incumbent solution\n")
         if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
             beta_star = result.pool(1).xn((1+5*m+1):(1+5*m+n),1);
@@ -285,21 +306,21 @@ if timelimit >= 0.0
         output_runtime = result.runtime;
     end
     
-    num_outliers_in_q = sum(z((m_normal+1):m,1))
+    num_outliers_in_q = sum(z((m_normal+1):m,1)) % number of outliers identified as inliers
     
     % get sum of squared error on non outliers
     dist = abs(X*beta_star); 
     if dep_var == true % get error along response direction, recall that beta_1 = -1
         tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
         sorteddist = sort(dist(:,1).*dist(:,1));
-        tsestar60 = sum(sorteddist(1:m_normal))
-        tse = sum(sorteddist(1:q))
+        tsestar60 = sum(sorteddist(1:m_normal)) % TSE* is based on m_normal, which we usually don't know
+        tse = sum(sorteddist(1:q)) % TSE is based on q, which we usually set to 0.5
     else % get orthogonal error
         gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
         edist = abs(dist/gradLen);
         sortededist = sort(edist(:,1).*edist(:,1));
-        tsestar60 = sum(sortededist(1:m_normal))
-        tse = sum(sortededist(1:q))
+        tsestar60 = sum(sortededist(1:m_normal))% TSE* is based on m_normal, which we usually don't know
+        tse = sum(sortededist(1:q))% TSE is based on q, which we usually set to 0.5
         tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
     end
     
@@ -317,20 +338,20 @@ if timelimit >= 0.0
         sortedabsdist = sortrows(sortedabsdist,2);
         newGamma60 = sortedabsdist(q,2)
         fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
-        for i=1:m
+        for i=1:m % calculate rminus and rplus
             if dist(i,1) > 0
                 rminus(i,1) = dist(i,1);
             else
                 rplus(i,1) = -dist(i,1);
             end
-            if rplus(i,1) + rminus(i,1) - newGamma60 > 0
+            if rplus(i,1) + rminus(i,1) - newGamma60 > 0 % calculate mubar and mu
                 mubar(i,1) = rplus(i,1) + rminus(i,1) - newGamma60;
             else
                 mu(i,1) = -rplus(i,1) - rminus(i,1) + newGamma60;
             end
         end
         for i=1:q
-            z(sortedabsdist(i,1),1) = 1;
+            z(sortedabsdist(i,1),1) = 1;  % specify inliers
         end
         model.start = [newGamma60; rplus; rminus; mu; mubar; z; beta_star];  
     elseif strcmp(formulation, "mio1") | strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strcmp(formulation, "cbq-mio1") | strcmp(formulation, "mio1-first") %MIO1
@@ -345,7 +366,7 @@ if timelimit >= 0.0
         sortedabsdist = sortrows(sortedabsdist,2);
         newGamma60 = sortedabsdist(q,2)  
         fprintf("Gamma recalculated from beta_start is %f\n", newGamma60);
-        for i=1:m
+        for i=1:m % calculate eminus, eplus
             if dist(i,1) > 0
                 eminus(i,1) = dist(i,1);
             else
@@ -354,10 +375,10 @@ if timelimit >= 0.0
         end
         rel = absdist;
         for i=1:q
-            z(sortedabsdist(i,1),1) = 1;
+            z(sortedabsdist(i,1),1) = 1;  % specify inliers
             rel(sortedabsdist(i,1),1) = 0;
         end
-        model.start = [newGamma60; rel; eplus; eminus; z; beta_star];  
+        model.start = [newGamma60; rel; eplus; eminus; z; beta_star];  % set initial solution
     end
 end
 
@@ -365,7 +386,7 @@ disp("solving 60 m")
 params.TimeLimit = 3600.0 + timelimit - 60.0;  %timelimit has 60s for first MIO built in, minus heuristic; timelimit may be negative if heuristic took longer than 60s
 result = gurobi(model, params);
 
-if strcmp(result.status, 'OPTIMAL')
+if strcmp(result.status, 'OPTIMAL')  % get optimal solution
     if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
         beta_star = result.x((1+5*m+1):(1+5*m+n),1);
         z = result.x(1+4*m+1:1+4*m+m,1);
@@ -373,7 +394,7 @@ if strcmp(result.status, 'OPTIMAL')
         beta_star = result.x((1+4*m+1):(1+4*m+n),1);
         z = result.x(1+3*m+1:1+3*m+m,1);
     end
-else 
+else  % get best solution
     %if result.mipgap ~= Inf
     fprintf("Using incumbent solution\n")
     if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strcmp(formulation, "mio-bm-first") | strcmp(formulation, "cbq-mio-bm") | strcmp(formulation, "mio-bm")
@@ -391,7 +412,7 @@ else
 end
 %qth_residuals = [f_beta1 f_beta_star];
 
-num_outliers_in_q = sum(z((m_normal+1):m,1))
+num_outliers_in_q = sum(z((m_normal+1):m,1)) % number of outliers identified as inliers
 f_beta_star = result.objval;
 
 % get sum of squared error on non outliers
@@ -399,14 +420,14 @@ dist = abs(X*beta_star);
 if dep_var == true % get error along response direction, recall that beta_1 = -1
     tot_err = sum(dist(1:m_normal,1).*dist(1:m_normal,1));
     sorteddist = sort(dist(:,1).*dist(:,1));
-    tsestar3600 = sum(sorteddist(1:m_normal))
-    tse = sum(sorteddist(1:q))
+    tsestar3600 = sum(sorteddist(1:m_normal))% TSE* is based on m_normal, which we usually don't know
+    tse = sum(sorteddist(1:q))% TSE is based on q, which we usually set to 0.5
 else % get orthogonal error
     gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
     edist = abs(dist/gradLen);
     sortededist = sort(edist(:,1).*edist(:,1));
-    tsestar3600 = sum(sortededist(1:m_normal))
-    tse = sum(sortededist(1:q))
+    tsestar3600 = sum(sortededist(1:m_normal))% TSE* is based on m_normal, which we usually don't know
+    tse = sum(sortededist(1:q))% TSE is based on q, which we usually set to 0.5
     tot_err = sum(edist(1:m_normal,1).*edist(1:m_normal,1));
 end
 
@@ -450,8 +471,19 @@ end
 %disp(result.status)
 beta_star
  
-% filename, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - mio-bm or mio1,total squared error to hyperplane (along response or orthogonal, gurobi runtime, gamma 
 newGamma60
+
+% - a result datafile is created containing the data file with full 
+%   path, iteration number, number of rows, number of variables, 
+%   number of non-outliers, q, formulation, total squared error, 
+%   MIP runtime, MIP status, gamma, best MIP bound, number of outliers
+%   identified as one of the q smallest by best MIP feasible solution,
+%   trimmed squared error (TSE) for the q smallest residuals, TSE for 
+%   m_normal residuals after 1 hour, time limit used for the solver,
+%   gamma obtained by using the beta from the warm start, TSE for 
+%   m_normal residuals for warm start, gamma obtained after 60s of MIO
+%   TSE for m_normal after 60s of MIO, gamma obtained after 3600s, TSE
+%   for m_normal after 3600s.
 
 fprintf(out_file, "%s,%d,%d,%d,%d,%d,%s,%f,%f,%s,%f,%f,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, formulation, tot_err, output_runtime, result.status, f_beta_star, result.objbound, num_outliers_in_q,tse,tsestar3600,timelimit,newGammaHeur,tsestarHeur,newGamma60,tsestar60,newGamma3600,tsestar3600);
 

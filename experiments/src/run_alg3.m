@@ -1,22 +1,21 @@
+% Algorithm 3 is proposed in Bertsimas and Mazumder (2014).  
 % run_alg3() is a composite heuristic for fitting a hyperplane to
-% minimize the q^th residual.  The version of algorithm 3 called by
-% mio.m and mio3.m is in algorithm3.m.  
-% code to run algorithm 3 only
+% minimize the q^th residual.  This file is a standalone 
+% implementation.
+% The version of algorithm 3 called by
+% mio.m as a warmstart to MIO is in algorithm3.m.  
 % Purpose: to find the best fitting hyperplance to a set of input 
 % data, where best fitting means that the absolute value of the 
 % q^th residual is minimized.  Bertsimas and Mazumder (2014) call
 % this Least Quantile of Squres (LQS) even though there is no square.
 % which can be affected by outliers.
 % Algorithm 3 begins by running L1 regression (LAD).  If no response
-% variable is specified, we use either PCA or an elastic LP.
+% variable is specified, we use PCA. 
 % The result is
 % perturbed 100 times and sent to Algorithm 2 for 500 iterations. 
 % Algorithm 2 is a subdifferential-based algorithm for LQS.  The best
 % solution is passed to Algorithm 1.  Algorithm 1 is a sequential 
 % linear optimization algorithm for LQS.
-% Algorithm 3 is proposed in Bertsimas and Mazumder (2014).  The 
-% result is used as a warm start for a mixed-integer optimization
-% approach.  
 % Algorithms 1 and 2 have been adapted to the case when no response
 % variable is specified. 
 
@@ -26,15 +25,14 @@
 %     The fit is determined by the q^th largest residual.
 % dep_var:
 %   - true: a dependent variable is specified, as in ordinary
-%           regression.  A residual is measured as the squared
-%           difference between the reponse value and the 
+%           regression.  A residual is measured as the absolute
+%           difference between the response value and the 
 %           vertical projection of the point on the fitted hyperplane
-%   - false: no dependent variable is specified. 
-%            A residual is measured using the elastic LP criterion,
-%            which is the absolute difference from zero of the inner
-%            product of coefficients and data.  Performance at the 
-%            end is measured using distance to the orthogonal 
-%            projection.
+%   - false: no dependent variable is specified. The intercept term 
+%            is fixed to n, the original number of variables in the
+%            dataset.  A residual is measured using the elastic LP
+%            measure which is the absolute difference between 
+%            beta^T x (including beta_0=n) and zero.
 % 
 % NOTES:
 % - when a dependent variable is specified, the corresponding 
@@ -48,7 +46,6 @@
 % - datafname: full path to the data file name.
 % - m_normal: the number of non-outliers in the data.
 % - resloc: directory for the output file.
-% - 
 % 
 % OUTPUTS:
 % - beta_star: the coefficients of the best-fit hyperplane.  When 
@@ -121,15 +118,15 @@ function [beta_star] =solve_lp(X, beta, q, dep_var) % called by Algorithm 1
         abs_residuals = abs(residuals);
         [out,idx] = sort(abs_residuals); % sort absolute residuals and get indexes
         w_star = zeros(m,1);
-        w_star(idx >= m-q+1,1) = 1; % get q largest residuals
+        w_star(idx(m-q+1:m),1) = 1; % get q largest residuals
         subg = transpose(X(:,2:n))*(times(-w_star,sign(residuals))); % calculate subgradient
         
         model.obj = [ (m-q+1); ones(m, 1); -subg ]; % theta; nu; beta
         model.lb  = [ -inf ; zeros(m,1); -inf(n-1,1) ];
-        model.A   = [ sparse(ones(m, 1)) speye(m) sparse(X(:,2:n)); % theta + nu_i >= y_i - x_i^T beta, for each point i
-            sparse(ones(m,1)) speye(m) sparse(-X(:,2:n)); % theta + nu_i >= -y_i + x_i^T beta, for each point i
+        model.A   = [ sparse(ones(m, 1)) speye(m) sparse(X(:,2:n));  % theta + nu_i >= y_i - x_i^T beta, for each point i
+            sparse(ones(m,1)) speye(m) sparse(-X(:,2:n)); % theta + nu_i >= -y_i+x_i^T beta for each point i
             (m-q+1) sparse(ones(1,m)) -subg' ]; % objective is at least 0
-        model.rhs = [X(:,1); -X(:,1); 0.0]; % +/- y_i
+        model.rhs = [X(:,1); -X(:,1); 0.0];  % +/- y_i
         model.sense = [repmat('>', 2*m, 1); '>'];
         model.modelsense = 'min';
         params = struct();
@@ -141,16 +138,16 @@ function [beta_star] =solve_lp(X, beta, q, dep_var) % called by Algorithm 1
         abs_residuals = abs(residuals);
         [out,idx] = sort(abs_residuals);
         w_star = zeros(m,1);
-        w_star(idx >= m-q+1,1) = 1; % get q largest residuals
+        w_star(idx(m-q+1:m),1) = 1; % get q largest residuals
         subg = transpose(X)*(times(-w_star,sign(residuals)));
         
         model.obj = [ (m-q+1); ones(m, 1); -subg ]; % theta; nu_i; beta
         model.lb  = [ -inf ; zeros(m,1); -inf(n,1) ];
-        model.A   = [ sparse(ones(m, 1)) speye(m) sparse(X);  % theta + nu_i >= -x^T beta, for each point i
-        sparse(ones(m,1)) speye(m) sparse(-X); % theta + nu_i >= x^T beta, for each point i
-        sparse(zeros(1,1)) sparse(zeros(1,m)) 1.0 sparse(zeros(1,n-1)); % beta_0 = n
+        model.A   = [ sparse(ones(m, 1)) speye(m) sparse(X); % theta + nu_i >= -x^T beta 
+        sparse(ones(m,1)) speye(m) sparse(-X); % theta + nu_i >= x^T beta
+        sparse(zeros(1,1)) sparse(zeros(1,m)) 1.0 sparse(zeros(1,n-1)); % beta_0 = n (n-1 because of column of ones for constant)
         (m-q+1) sparse(ones(1,m)) -subg' ]; % objective is at least 0
-        model.rhs = [zeros(m,1); zeros(m,1) ; n; 0.0]; % 0; 0; n-1; 0
+        model.rhs = [zeros(m,1); zeros(m,1) ; n-1; 0.0]; % 0; 0; n-1; 0
         model.sense = [repmat('>', 2*m, 1) ; '='; '>'];
         model.modelsense = 'min';
         params = struct();
@@ -167,12 +164,12 @@ function [beta_kplus1, q_residual_k] = algorithm1(X, beta, q, dep_var) % sequent
     if dep_var == true
         residuals_k = abs(X(:,1) - X(:,2:n)*beta); % absolute value of response minus projection on hyperplane
         [out_k, idx_k] = sort(residuals_k);
-        q_residual_k = residuals_k(idx_k == q); % q^th largest absolute residual
+        q_residual_k = residuals_k(idx_k(q)); % q^th largest absolute residual
         while 0 < 1
             beta_kplus1 = solve_lp(X, beta, q, dep_var); % get new beta
             residuals_kplus1 = abs(X(:,1) - X(:,2:n)*beta_kplus1); % calculate new residuals
             [out_kplus1, idx_kplus1] = sort(residuals_kplus1); % sort residuals and get indexes
-            q_residual_kplus1 = residuals_kplus1(idx_kplus1==q); % q^th largest residual
+            q_residual_kplus1 = residuals_kplus1(idx_kplus1(q)); % q^th largest residual
             if abs(q_residual_k - q_residual_kplus1) <= Tol*q_residual_k % if converged, stop
                 return
             end
@@ -181,15 +178,14 @@ function [beta_kplus1, q_residual_k] = algorithm1(X, beta, q, dep_var) % sequent
         end
     else % no dependent variable
         residuals_k = abs(X*beta); % absolute value of distance to hyperplane using elastic LP criterion
-        [out_k, idx_k] = sort(residuals_k); % sort residuals and get indexes 
-        q_residual_k = residuals_k(idx_k == q); % q^th largest residual
+        [out_k, idx_k] = sort(residuals_k); % sort residuals and get indexes
+        q_residual_k = residuals_k(idx_k(q)); % q^th largest residual
         while 0 < 1
             beta_kplus1 = solve_lp(X, beta, q, dep_var); % get new beta
             residuals_kplus1 = abs(X*beta_kplus1); % calculate new residuals
             [out_kplus1, idx_kplus1] = sort(residuals_kplus1); % sort new residuals
-            q_residual_kplus1 = residuals_kplus1(idx_kplus1==q); % q^th largest residual
+            q_residual_kplus1 = residuals_kplus1(idx_kplus1(q)); % q^th largest residual
             if abs(q_residual_k - q_residual_kplus1) <= Tol*q_residual_k % if converged, stop
-                residuals_kplus1;
                 return
             end
             q_residual_k = q_residual_kplus1;
@@ -205,15 +201,16 @@ function [f_beta_star, beta_star] = algorithm2(X, beta, MaxIter, q, dep_var) % s
         l2_norms = vecnorm(X(:,2:n),2,2); % get 2-norm of each row
         alpha_k = 1/max(l2_norms); % stepsize is constant as in paper
         residuals = X(:,1) - X(:,2:n)*beta_star; % residuals are response minus projections on hyperplane
-        abs_residuals = abs(residuals); 
+        abs_residuals = abs(residuals);
         [out, idx] = sort(abs_residuals); % sort absolute residuals and get indexes
-        f_beta_star = abs_residuals(idx==q); % get q^th largest residual
+        f_beta_star = abs_residuals(idx(q)); % get q^th largest residual
         for k = 1:MaxIter
-            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx==q)))*transpose(X(idx==q,2:n)); % update beta
+            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx(q))))*transpose(X(idx(q),2:n)); % update beta
             residuals = X(:,1) - X(:,2:n)*beta_kplus1; % calculate new residuals
-            abs_residuals = abs(residuals); 
-            [out, idx] = sort(abs_residuals);% sort residuals and get indexes 
-            f_beta = abs_residuals(idx==q);% get q^th largest residual
+            abs_residuals = abs(residuals);
+            [out, idx] = sort(abs_residuals); % sort residuals and get indexes
+            f_beta = abs_residuals(idx(q)); % get q^th largest residual
+            sortedabsresid = sort(abs_residuals);
             if f_beta < f_beta_star % if the q^th largest is better, update the solution
                 f_beta_star = f_beta;
                 beta_star = beta_kplus1;
@@ -226,13 +223,13 @@ function [f_beta_star, beta_star] = algorithm2(X, beta, MaxIter, q, dep_var) % s
         residuals = X*beta_star; % calculate residuals using elastic LP criterion
         abs_residuals = abs(residuals);
         [out, idx] = sort(abs_residuals); % sort residuals and get indexes
-        f_beta_star = abs_residuals(idx==q); % get q^th largest residual
+        f_beta_star = abs_residuals(idx(q)); % get q^th largest residual
         for k = 1:MaxIter
-            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx==q)))*transpose(X(idx==q,:)); % get beta
+            beta_kplus1 = beta - alpha_k * (-sign(residuals(idx(q))))*transpose(X(idx(q),:)); % update beta
             residuals = X*beta_kplus1; % calculate new residuals
             abs_residuals = abs(residuals);
             [out, idx] = sort(abs_residuals); % sort new residuals and get indexes
-            f_beta = abs_residuals(idx==q); % get q^th largest residual
+            f_beta = abs_residuals(idx(q)); % get q^th largest residual
             if f_beta < f_beta_star % if q^th largest is better, update
                 f_beta_star = f_beta;
                 beta_star = beta_kplus1;
@@ -297,7 +294,7 @@ out_file = fopen(out_fname, "w");
 %disp(result.status)
 beta_star
  
-% filename including path, total number of points, number of variables, number of non-outliers, q - percentile for LQS, formulation - alg3,total squared error to hyperplane (along response or orthogonal, gurobi runtime, gamma 
+% filename including path, iteration, total number of points, number of variables, number of non-outliers, q, initialization method (LP or PCA), total squared error to hyperplane (along response or orthogonal, gamma, runtime, sum of m_normal smallest errors (LTS*/TSE*)
 fprintf(out_file, "%s,%d,%d,%d,%d,%d,alg3%s,%f,%f,%f,%f\n", datafname, iteration, m, n-1, m_normal, q, init_method, tot_err, f_beta_star,alg3_time,alg3_lts);
 
 fclose(out_file);
