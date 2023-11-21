@@ -1,4 +1,4 @@
-
+# updates November 2023 - recording times for arob, bb in the hbreg() function
 
 ##The command
 ##source("http://parker.ad.siu.edu/Olive/mpack.txt")
@@ -3384,6 +3384,9 @@ hbreg<-function(x, y, csteps = 10, a = 1.4, rreg = T, type = 1)
 # mbareg if type = 1, ltsreg if type = 2, mbalata if type = 3 
 # rmreg2 if type =4.
 # Calls mbareg, mbalata, rmreg3 which is rmreg2 without plots.
+arob_time <- proc.time()
+bb_time <- proc.time()
+
 med <- median(y)
 madd <- mad(y, constant = 1)
 x <- as.matrix(x)
@@ -3418,6 +3421,8 @@ if(rreg == T){
    critf <- crit
    hbf <- tem$coef}
 }
+arob_time <- proc.time() - arob_time
+
 #get y's closest to median y
 indx <- (y >= (med - madd) & y <= (med + madd))
 #get the HB attractor bk = BB
@@ -3426,23 +3431,28 @@ res <- y - (x %*% bk[2:nc] + bk[1])
 ressq <- res^2
 m <- median(ressq)
 for(i in 1:csteps) {
-indx <- (ressq <= m)
-bk <- lsfit(x[indx,  ], y[indx])$coef
-res <- y - (x %*% bk[2:nc] + bk[1])
-ressq <- res^2
-m <- median(ressq)
+  indx <- (ressq <= m)
+  bk <- lsfit(x[indx,  ], y[indx])$coef
+  res <- y - (x %*% bk[2:nc] + bk[1])
+  ressq <- res^2
+  m <- median(ressq)
 }
 bb <-  bk
+bb_time <- proc.time() - bb_time
 res <- y - (x %*% bb[2:nc] + bb[1])
 absres <- abs(res)
 indx <- (absres <= median(absres))
 crit <- a*sum(absres[indx])
+
 if(crit < critf)
-hbf <- bb
+  hbf <- bb
+
 if(rreg == T && type != 4) arobcoef <- tem$coef
 else if (rreg == T && type == 4) arobcoef <- as.vector(tem$Bhat)
 else arobcoef <- temp$coef
-list(coef = hbf, olscoef = temp$coef, arobcoef = arobcoef, bbcoef = bb)
+
+list(coef = hbf, olscoef = temp$coef, arobcoef = arobcoef, bbcoef = bb, 
+     arob_time = arob_time, bb_time = bb_time)
 }
 
 

@@ -54,6 +54,7 @@
 %                value of the q^th largest residual.
 
 function [beta_star, f_beta_star] = algorithm3(X,q,dep_var,init_method) % starts near the bottom; subfunctions defined at the top
+rng('default')
 %Algorithm 3 starts here -------------------------------------------------
 %X  = X{:,:};
 [m,n] = size(X); % get the size of dataset; for datasets with no response, a column of 1s is included

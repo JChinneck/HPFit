@@ -32,15 +32,16 @@ write.table(buxton,
 
 # Gladstone (1906).  glado  
 Nine points from original dataset omitted because of missing values.  6 infants are good leverage points - rest of data is for adults.  Observation 115 has a mis-entered "len" value of 109.
-mtot = 267, m_outliers = 7, n=12.
+mtot = 267, m_outliers = 1, n=12.
 ```{r echo=FALSE}
 source("olive/mrobdata.txt")
 glado <- data.frame(gladoy, gladox)
 
-infants <- which(glado$age < 1)
-glado <- rbind(glado[-c(infants,115), ], glado[c(infants,115),])
+#infants <- which(glado$age < 1) # these are good leverage points
+#glado <- rbind(glado[-c(infants,115), ], glado[c(infants,115),])
+glado <- rbind(glado[-c(115), ], glado[c(115),])
 write.table(glado, 
-            file="olive/m260n12_gladoi1.csv", 
+            file="olive/m266n12_gladoi1.csv", 
             row.names = FALSE, 
             col.names = FALSE,
             sep=",")
@@ -48,7 +49,7 @@ write.table(glado,
 
 # Hawkins, DM, Bradu, D, Kass, GV (1984). hbk
 Artificial data.  1-10 are outliers, 11-14 are good leverage points.
-mtot = 75, m_outliers = 14, n=4.
+mtot = 75, m_outliers = 10, n=4.
 ```{r echo=FALSE}
 hbk <- matrix(c( 
 10.1,19.6,28.3,9.7
@@ -131,9 +132,10 @@ hbk <- matrix(c(
 Move last column to first.  Move outliers to end.
 ```{r echo=FALSE}
 hbk <- hbk[,c(ncol(hbk), 1:(ncol(hbk)-1))]
-hbk <- rbind(hbk[-c(1:14), ], hbk[c(1:14),])
+#hbk <- rbind(hbk[-c(1:14), ], hbk[c(1:14),])
+hbk <- rbind(hbk[-c(1:10), ], hbk[c(1:10),])
 write.table(hbk, 
-            file="olive/m61n4_hbki2.csv", 
+            file="olive/m65n4_hbki2.csv", 
             row.names = FALSE, 
             col.names = FALSE,
             sep=",")

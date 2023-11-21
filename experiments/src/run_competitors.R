@@ -199,6 +199,7 @@ fit_hbreg <- function(j, X, m, n, q) { # for hbreg from Olive (2018) mpack.txt
   hbreg_rq <- quantile(hbreg_res, q) # get the q^th largest squared distance
   hbreg_lts <- sum(sort(hbreg_res)[1:m])# sum of m smallest squared residuals, measured orthogonally
 
+  arob_time <- my_hbreg$arob_time
   arob_norm <- my_hbreg$arobcoef[2:length(my_hbreg$arobcoef)]# get normal vector to hyperplane
   arob_norm[is.na(arob_norm)] <- 0.0
   arob_norm <- append(arob_norm, -1.0, after=j-1)# coefficient for the dependent variable is -1
@@ -211,6 +212,8 @@ fit_hbreg <- function(j, X, m, n, q) { # for hbreg from Olive (2018) mpack.txt
   arob_res <- apply(X,1,hyper_dist_sq,w=arob_norm,b=arob_intercept)# calculate all squared distances
   arob_rq <- quantile(arob_res, q)# get the q^th largest squared distance
   arob_lts <- sum(sort(arob_res)[1:m])# sum of m smallest squared residuals, measured orthogonally
+ 
+  bb_time <- my_hbreg$bb_time
   bb_norm <- my_hbreg$bbcoef[2:length(my_hbreg$bbcoef)]# get normal vector to hyperplane
   bb_norm[is.na(bb_norm)] <- 0.0
   bb_norm <- append(bb_norm, -1.0, after=j-1)# coefficient for the dependent variable is -1
@@ -231,11 +234,13 @@ fit_hbreg <- function(j, X, m, n, q) { # for hbreg from Olive (2018) mpack.txt
               hbreg_intercept=hbreg_intercept,
               hbreg_rq=hbreg_rq,
               hbreg_lts=hbreg_lts,
+              arob_time=arob_time,
               arob_dist=arob_dist,
               arob_norm=arob_norm,
               arob_intercept=arob_intercept,
               arob_rq=arob_rq,
               arob_lts=arob_lts,
+              bb_time=bb_time,
               bb_dist=bb_dist,
               bb_norm=bb_norm,
               bb_intercept=bb_intercept,
@@ -336,6 +341,87 @@ lqs_gamma <- function(j, X, m, n, q) {
         )
 }
 
+# fit M regression with jth column as the response
+fit_mh <- function(j, X, m, n, q) { # for M regression - rlm
+  cat(j, " ")
+  #j<-1
+  my_formula <- as.formula(paste("V", j, " ~ .", sep="")) # set j^th column as response, all others are predictors
+  
+  my_mh <- rlm(my_formula, data=X, method="M") # fit model
+  mh_norm <- my_mh$coefficients[2:length(my_mh$coefficients)] # get normal vector to hyperplane 
+  mh_norm[is.na(mh_norm)] <- 0.0
+  mh_norm <- append(mh_norm, -1.0, after=j-1) # coefficient for the dependent variable is -1
+  mh_intercept <- my_mh$coefficients[1] # get the intercept
+  mh_dist <- sum(apply(X[1:m,], 
+                           1,  
+                           hyper_dist_sq,  
+                           w=mh_norm,
+                           b=mh_intercept)) # sum of squared orthogonal distances
+  mh_res <- apply(X,1,hyper_dist_sq,w=mh_norm,b=mh_intercept) # calculate all squared distances
+  mh_rq <- quantile(mh_res, q) # get the q^th largest squared distance
+  mh_lts <- sum(sort(mh_res)[1:m]) # sum of m smallest squared residuals, measured orthogonally
+  return(list(
+    mh_dist=mh_dist, 
+    mh_norm=mh_norm,
+    mh_intercept=mh_intercept,
+    mh_rq=mh_rq,
+    mh_lts=mh_lts))
+}
+
+# fit MM regression with jth column as the response
+fit_mm <- function(j, X, m, n, q) { # for MM regression - lmRob
+  cat(j, " ")
+  #j<-1
+  my_formula <- as.formula(paste("V", j, " ~ .", sep="")) # set j^th column as response, all others are predictors
+  
+  my_mm <- lmRob(my_formula, data=X) # fit model
+  mm_norm <- my_mm$coefficients[2:length(my_mm$coefficients)] # get normal vector to hyperplane 
+  mm_norm[is.na(mm_norm)] <- 0.0
+  mm_norm <- append(mm_norm, -1.0, after=j-1) # coefficient for the dependent variable is -1
+  mm_intercept <- my_mm$coefficients[1] # get the intercept
+  mm_dist <- sum(apply(X[1:m,], 
+                           1,  
+                           hyper_dist_sq,  
+                           w=mm_norm,
+                           b=mm_intercept)) # sum of squared orthogonal distances
+  mm_res <- apply(X,1,hyper_dist_sq,w=mm_norm,b=mm_intercept) # calculate all squared distances
+  mm_rq <- quantile(mm_res, q) # get the q^th largest squared distance
+  mm_lts <- sum(sort(mm_res)[1:m]) # sum of m smallest squared residuals, measured orthogonally
+  return(list(
+    mm_dist=mm_dist, 
+    mm_norm=mm_norm,
+    mm_intercept=mm_intercept,
+    mm_rq=mm_rq,
+    mm_lts=mm_lts))
+}
+
+# fit REWLSE regression with jth column as the response
+fit_rewlse <- function(j, X, m, n, q) { # for REWLSE regression - lmRob
+  cat(j, " ")
+  #j<-1
+  my_formula <- as.formula(paste("V", j, " ~ .", sep="")) # set j^th column as response, all others are predictors
+  
+  my_rewlse <- lmRob(my_formula, data=X, control=lmRob.control(final.alg="Adaptive")) # fit model
+  rewlse_norm <- my_rewlse$coefficients[2:length(my_rewlse$coefficients)] # get normal vector to hyperplane 
+  rewlse_norm[is.na(rewlse_norm)] <- 0.0
+  rewlse_norm <- append(rewlse_norm, -1.0, after=j-1) # coefficient for the dependent variable is -1
+  rewlse_intercept <- my_rewlse$coefficients[1] # get the intercept
+  rewlse_dist <- sum(apply(X[1:m,], 
+                           1,  
+                           hyper_dist_sq,  
+                           w=rewlse_norm,
+                           b=rewlse_intercept)) # sum of squared orthogonal distances
+  rewlse_res <- apply(X,1,hyper_dist_sq,w=rewlse_norm,b=rewlse_intercept) # calculate all squared distances
+  rewlse_rq <- quantile(rewlse_res, q) # get the q^th largest squared distance
+  rewlse_lts <- sum(sort(rewlse_res)[1:m]) # sum of m smallest squared residuals, measured orthogonally
+  return(list(
+    rewlse_dist=rewlse_dist, 
+    rewlse_norm=rewlse_norm,
+    rewlse_intercept=rewlse_intercept,
+    rewlse_rq=rewlse_rq,
+    rewlse_lts=rewlse_lts))
+}
+
 
 run_alg3 <- function(dataloc, srcloc, fname, q, dep_var, resloc, mosekloc, init_method) {
   my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
@@ -396,21 +482,19 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
       hbreg_lts <- sum(sort(hbreg_res^2)[1:m])
       hbreg_time <- proc.time() - hbreg_time
 
-      arob_time <- proc.time()
+      arob_time <- my_hbreg$arob_time
       arob_norm <- my_hbreg$arobcoef[2:length(my_hbreg$arobcoef)]
       arob_res <- X[,1] - as.matrix(X[,2:n]) %*% arob_norm - my_hbreg$arobcoef[1]
       arob_dist <- sum(arob_res[1:m]^2)
       arob_rq <- quantile(abs(arob_res), q)
       arob_lts <- sum(sort(arob_res^2)[1:m])
-      arob_time <- proc.time() - arob_time
 
-      bb_time <- proc.time() 
+      bb_time <- my_hbreg$bb_time
       bb_norm <- my_hbreg$bbcoef[2:length(my_hbreg$bbcoef)]
       bb_res <- X[,1] - as.matrix(X[,2:n]) %*% bb_norm - my_hbreg$bbcoef[1]
       bb_dist <- sum(bb_res[1:m]^2)
       bb_rq <- quantile(abs(bb_res), q)
       bb_lts <- sum(sort(bb_res^2)[1:m])
-      bb_time <- proc.time() - bb_time
 
       lts_time <- proc.time() 
       my_lts <- lqs(V1 ~ ., data=X, method="lts", quantile=floor(q*m)) 
@@ -447,6 +531,21 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
       write(lqs_out, file=paste(resloc, "/lqsi", i, ".csv", sep=""), ncol=length(lqs_out))
  
   } else {
+      pca_time <- proc.time() 
+      my_means <- colMeans(X)
+      my_pca <- prcomp(X)
+      pca_norm <- my_pca$rotation[,ncol(X)]
+      pca_intercept <- -sum(my_means*pca_norm) # hyperplane equation is w^Tx + b = 0
+      pca_dist <- sum(apply(X[1:m,], 1, hyper_dist_sq, w=pca_norm, b=pca_intercept))
+      pca_res <- apply(X, 1, hyper_dist_sq, w=pca_norm, b=pca_intercept)
+      pca_rq <- quantile(abs(pca_res), q)
+      pca_lts <- sum(sort(pca_res)[1:m])
+      pca_time <- proc.time() - pca_time
+
+      pca_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "pca", pca_dist, pca_rq, pca_time[1], pca_time[2], pca_time[3], pca_lts, sep=",")
+      print(pca_out)
+      write(pca_out, file=paste(resloc, "/pcai", i, ".csv", sep=""))
+
       lm_time <- proc.time()
       lm_results <- lapply(1:n, fit_lm, X, m, n, q)
       lm_dists <- sapply(lm_results, function(x) x$lm_dist)
@@ -479,6 +578,7 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
           hbreg_rq <- hbreg_rqs[which(hbreg_dists == min(hbreg_dists))]
           hbreg_ltss <- sapply(hbreg_results, function(x) x$hbreg_lts)
           hbreg_lts <- hbreg_ltss[which(hbreg_dists == min(hbreg_dists))]
+          hbreg_time <- proc.time() - hbreg_time
           
           arob_dists <- sapply(hbreg_results, function(x) x$arob_dist)
           arob_dist <- min(arob_dists)
@@ -490,6 +590,8 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
           arob_rq <- arob_rqs[which(arob_dists == min(arob_dists))]
           arob_ltss <- sapply(hbreg_results, function(x) x$arob_lts)
           arob_lts <- arob_ltss[which(arob_dists == min(arob_dists))]
+          arob_times <- sapply(hbreg_results, function (x) x$arob_time)
+          arob_time <- sum(arob_times)
 
           bb_dists <- sapply(hbreg_results, function(x) x$bb_dist)
           bb_norms <- sapply(hbreg_results, function(x) x$bb_norm)
@@ -501,13 +603,14 @@ get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mos
           bb_rq <- bb_rqs[which(bb_dists == min(bb_dists))]
           bb_ltss <- sapply(hbreg_results, function(x) x$bb_lts)
           bb_lts <- bb_ltss[which(bb_dists == min(bb_dists))]
+          bb_times <- sapply(hbreg_results, function (x) x$bb_time)
+          bb_time <- sum(bb_times)
 
-          hbreg_time <- proc.time() - hbreg_time
           hbreg_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "hbreg", hbreg_dist, hbreg_rq, hbreg_time[1], hbreg_time[2], hbreg_time[3], hbreg_lts, sep=",")
           write(hbreg_out, file=paste(resloc, "/hbregi", i, ".csv", sep=""))
-          arob_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "arob", arob_dist, arob_rq, hbreg_time[1], hbreg_time[2], hbreg_time[3], arob_lts, sep=",")
+          arob_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "arob", arob_dist, arob_rq, arob_time[1], arob_time[2], arob_time[3], arob_lts, sep=",")
           write(arob_out, file=paste(resloc, "/arobi", i, ".csv", sep=""))
-          bb_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "bb", bb_dist, bb_rq, hbreg_time[1], hbreg_time[2], hbreg_time[3], bb_lts, sep=",")
+          bb_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "bb", bb_dist, bb_rq, bb_time[1], bb_time[2], bb_time[3], bb_lts, sep=",")
           write(bb_out, file=paste(resloc, "/bbi", i, ".csv", sep=""))
       }
 
@@ -613,6 +716,162 @@ no_hbreg <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mose
 
 }
 
+## -----------------------------------------------------------------------------------------------------
+get_mh <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc) {
+  #loc <- 'vary_everything'
+  #fname <- 'm102n47m_outliers5num_clust1same_sideFALSEoutlier_dist1000i848.csv'
+  #fname <- "m650n10m_outliers350i0.csv"
+  #loc <- 'rd'
+  #library(MASS)
+  #source("../2021_02_hyper_data/olive/mpack.txt")
+  #q <- 0.64
+  print("mh")
+  print("srcloc")
+  print(srcloc)
+  
+  my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
+  my_regmatch <- regmatches(fname, my_regexec)
+  m <- as.numeric(my_regmatch[[1]][2])
+  n <- as.numeric(my_regmatch[[1]][3])
+  i <- as.numeric(my_regmatch[[1]][4])
+  cat("\n", i, "\n")
+  X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
+  if (dep_var == TRUE) {
+      # M-estimator Huber
+      mh_time <- proc.time()
+      my_mh <- rlm(V1 ~ ., data=X, method="M")  
+      mh_dist <- sum(my_mh$residuals[1:m]^2)
+      mh_rq <- quantile(abs(my_mh$residuals), q)
+      mh_lts <- sum(sort(my_mh$residuals^2)[1:m])
+      mh_time <- proc.time() - mh_time
+
+      # update after here
+      mh_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "mh", mh_dist, mh_rq, mh_time[1], mh_time[2], mh_time[3], mh_lts, sep=",")
+      print(mh_out)
+      write(mh_out, file=paste(resloc, "/mhi", i, ".csv", sep=""), ncol=length(mh_out))
+  } else {
+      mh_time <- proc.time()
+      mh_results <- lapply(1:n, fit_mh, X, m, n, q)
+      mh_dists <- sapply(mh_results, function(x) x$mh_dist)
+      mh_dist <- min(mh_dists)
+      mh_norms <- sapply(mh_results, function(x) x$mh_norm)
+      mh_intercepts <- sapply(mh_results, function(x) x$mh_intercept)
+      mh_norm <- mh_norms[,which(mh_dists == min(mh_dists))]
+      mh_intercept <- mh_intercepts[which(mh_dists == min(mh_dists))]
+      mh_rqs <- sapply(mh_results, function(x) x$mh_rq)
+      mh_rq <- mh_rqs[which(mh_dists == min(mh_dists))]
+      mh_ltss <- sapply(mh_results, function(x) x$mh_lts)
+      mh_lts <- mh_ltss[which(mh_dists == min(mh_dists))]
+      mh_time <- proc.time() - mh_time
+
+      mh_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "mh", mh_dist, mh_rq, mh_time[1], mh_time[2], mh_time[3], mh_lts, sep=",")
+      print(mh_out)
+      write(mh_out, file=paste(resloc, "/mhi", i, ".csv", sep=""))
+
+  }
+}
+
+get_mm <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc) {
+  #loc <- 'vary_everything'
+  #fname <- 'm102n47m_outliers5num_clust1same_sideFALSEoutlier_dist1000i848.csv'
+  #fname <- "m650n10m_outliers350i0.csv"
+  #loc <- 'rd'
+  #library(MASS)
+  #source("../2021_02_hyper_data/olive/mpack.txt")
+  #q <- 0.64
+  print("srcloc")
+  print(srcloc)
+  
+  my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
+  my_regmatch <- regmatches(fname, my_regexec)
+  m <- as.numeric(my_regmatch[[1]][2])
+  n <- as.numeric(my_regmatch[[1]][3])
+  i <- as.numeric(my_regmatch[[1]][4])
+  cat("\n", i, "\n")
+  X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
+  if (dep_var == TRUE) {
+      # MM-estimator
+      mm_time <- proc.time()
+      my_mm <- lmRob(V1 ~ ., data=X)  
+      mm_dist <- sum(my_mm$residuals[1:m]^2)
+      mm_rq <- quantile(abs(my_mm$residuals), q)
+      mm_lts <- sum(sort(my_mm$residuals^2)[1:m])
+      mm_time <- proc.time() - mm_time
+
+
+      print(mm_out)
+      write(mm_out, file=paste(resloc, "/mmi", i, ".csv", sep=""), ncol=length(mm_out))
+  } else {
+      mm_time <- proc.time()
+      mm_results <- lapply(1:n, fit_mm, X, m, n, q)
+      mm_dists <- sapply(mm_results, function(x) x$mm_dist)
+      mm_dist <- min(mm_dists)
+      mm_norms <- sapply(mm_results, function(x) x$mm_norm)
+      mm_intercepts <- sapply(mm_results, function(x) x$mm_intercept)
+      mm_norm <- mm_norms[,which(mm_dists == min(mm_dists))]
+      mm_intercept <- mm_intercepts[which(mm_dists == min(mm_dists))]
+      mm_rqs <- sapply(mm_results, function(x) x$mm_rq)
+      mm_rq <- mm_rqs[which(mm_dists == min(mm_dists))]
+      mm_ltss <- sapply(mm_results, function(x) x$mm_lts)
+      mm_lts <- mm_ltss[which(mm_dists == min(mm_dists))]
+      mm_time <- proc.time() - mm_time
+
+      mm_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "mm", mm_dist, mm_rq, mm_time[1], mm_time[2], mm_time[3], mm_lts, sep=",")
+      print(mm_out)
+      write(mm_out, file=paste(resloc, "/mmi", i, ".csv", sep=""))
+  }
+}
+
+get_rewlse <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc) {
+  #loc <- 'vary_everything'
+  #fname <- 'm102n47m_outliers5num_clust1same_sideFALSEoutlier_dist1000i848.csv'
+  #fname <- "m650n10m_outliers350i0.csv"
+  #loc <- 'rd'
+  #library(MASS)
+  #source("../2021_02_hyper_data/olive/mpack.txt")
+  #q <- 0.64
+  print("srcloc")
+  print(srcloc)
+  
+  my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
+  my_regmatch <- regmatches(fname, my_regexec)
+  m <- as.numeric(my_regmatch[[1]][2])
+  n <- as.numeric(my_regmatch[[1]][3])
+  i <- as.numeric(my_regmatch[[1]][4])
+  cat("\n", i, "\n")
+  X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
+  if (dep_var == TRUE) {
+      # REWLSE-estimator
+      rewlse_time <- proc.time()
+      my_rewlse <- lmRob(V1 ~ ., data=X, control=lmRob.control(final.alg="Adaptive"))  
+      rewlse_dist <- sum(my_rewlse$residuals[1:m]^2)
+      rewlse_rq <- quantile(abs(my_rewlse$residuals), q)
+      rewlse_lts <- sum(sort(my_rewlse$residuals^2)[1:m])
+      rewlse_time <- proc.time() - rewlse_time
+
+      rewlse_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "rewlse", rewlse_dist, rewlse_rq, rewlse_time[1], rewlse_time[2], rewlse_time[3], rewlse_lts, sep=",")
+      print(rewlse_out)
+      write(rewlse_out, file=paste(resloc, "/rewlsei", i, ".csv", sep=""), ncol=length(rewlse_out))
+  } else {
+      rewlse_time <- proc.time()
+      rewlse_results <- lapply(1:n, fit_rewlse, X, m, n, q)
+      rewlse_dists <- sapply(rewlse_results, function(x) x$rewlse_dist)
+      rewlse_dist <- min(rewlse_dists)
+      rewlse_norms <- sapply(rewlse_results, function(x) x$rewlse_norm)
+      rewlse_intercepts <- sapply(rewlse_results, function(x) x$rewlse_intercept)
+      rewlse_norm <- rewlse_norms[,which(rewlse_dists == min(rewlse_dists))]
+      rewlse_intercept <- rewlse_intercepts[which(rewlse_dists == min(rewlse_dists))]
+      rewlse_rqs <- sapply(rewlse_results, function(x) x$rewlse_rq)
+      rewlse_rq <- rewlse_rqs[which(rewlse_dists == min(rewlse_dists))]
+      rewlse_ltss <- sapply(rewlse_results, function(x) x$rewlse_lts)
+      rewlse_lts <- rewlse_ltss[which(rewlse_dists == min(rewlse_dists))]
+      rewlse_time <- proc.time() - rewlse_time
+
+      rewlse_out <- paste(paste(dataloc, "/", fname, sep=""), i, nrow(X), n, m, q, "rewlse", rewlse_dist, rewlse_rq, rewlse_time[1], rewlse_time[2], rewlse_time[3], rewlse_lts, sep=",")
+      print(rewlse_out)
+      write(rewlse_out, file=paste(resloc, "/rewlsei", i, ".csv", sep=""))
+  }
+}
 
 ## -----------------------------------------------------------------------------------------------------
 hyper_dist_sq <- function(w,b,x) {

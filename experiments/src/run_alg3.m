@@ -61,6 +61,7 @@
 
 function [beta_star, f_beta_star] = run_alg3(iteration, datafname,q, m_normal, dep_var, resloc, init_method) % includes subfunctions
 
+rng('default')
 disp("running alg3")
 dep_var
 
