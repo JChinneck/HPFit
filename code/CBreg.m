@@ -1,4 +1,4 @@
-% December 13, 2022
+% December 5, 2023
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -27,7 +27,7 @@
 %              There are 3 cases:
 %              < 0: -maxResid is the percentile of residuals from the first
 %                   regression to be used as maxDist. Note it is in %. 
-%                   NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
+%                   NOTE: maxDist = -50 IS HIGHLY RECOMMENDED.
 %              = 0: means that maxResid is not used to help identify the
 %                   best hyperplane to output.
 %              > 0: used as an actual residual value to define maxResid
@@ -54,10 +54,11 @@
 %      .totSqResidTru[x]: total squared residuals over the mgood points
 %      .TSEstar[x]: the "sum of mgood smallest squared residual errors" for 
 %        the hyperplanes. Note that isn't necessarily over the mgood 
-%        pre-specified non-outlier points, just over mgood points in total.
-%      .bnd2: this is a tight upper bound on the best possible TSEstar value,
+%        pre-specified inlier points, just over mgood points in total.
+%      .bnd2: this is an upper bound on the best possible TSEstar value,
 %        calculated by fitting to only the mgood points and then
-%        calculating the TSEstar for those points. 
+%        calculating the TSEstar for those points. Usually tight, but not
+%        necessarily so high outlier fractions.
 %      .RMSETru[x]: root mean square residual for the mgood points
 %      .MSETru[x]: mean squared residual for the mgood points
 %      .MAETru[x]: mean absolute residual for the mgood points
@@ -128,6 +129,10 @@ if max(absresid) < 1.0e-6
     inc.maxResid = 0;
     inc.bnd2 = 0;
     inc.status = 1;
+    if mgood > 0
+        inc.numCloseTruOut = mgood;
+        inc.numCloseAllOut = mgood;
+    end
     return
 end
 
@@ -139,13 +144,15 @@ inc.maxResid = maxResid; % record the final value of maxResid
 
 inc.resid1 = resid;
 if mgood > 0
+    if maxResid >= 0
+        inc.numCloseTru1 = sum(absresid(1:mgood,1) < maxResid);
+        inc.numCloseTruOut = inc.numCloseTru1;
+    end
     inc.totSqResidTru1 = norm(absresid(1:mgood,1).*absresid(1:mgood,1),1);
+    inc.totSqResidTruOut = inc.totSqResidTru1;
     inc.RMSETru1 = sqrt(inc.totSqResidTru1);
     inc.MSETru1 = inc.totSqResidTru1/mgood;
     inc.MAETru1 = sum(abs(absresid(1:mgood,1)))/mgood;
-    if maxResid > 0
-        inc.numCloseTru1 = sum(absresid(1:mgood,1) <= maxResid);
-    end
     % Calculate bnd2: regression on only the mgood points
     betabnd = regress(y(1:mgood,1),A(1:mgood,:));
     w0bnd = betabnd(1,1);
@@ -177,8 +184,10 @@ inc.totSqResidAllOut = inc.totSqResidAll1;
 
 % Analyze and remove outliers ---------------------------------------------
 
-[OM] = outFinder([Aorig,y],mgood);
+[OM] = outFinderReg(Aorig,y,absresid,mgood);
+
 inc.q = OM.q;
+inc.numZeroMedians = OM.numZeroMedians;
 B = zeros(m,norig);
 y1 = zeros(m,1);
 icount = 0;
@@ -261,6 +270,12 @@ if m - sum(outliers) < norig
         outliers(sortedabsResid(i,1),1) = 1;
     end
 end
+
+% Calculate outlier fractions at this stage (step 5)
+if mgood > 0
+    inc.step5FracInOut = sum(outliers(1:mgood)/mgood);
+    inc.step5FracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
+end
    
 B = zeros(m,norig);
 y1 = zeros(m,1);
@@ -286,6 +301,10 @@ resid = w0 + Aorig*w - y;
 absresid = abs(resid);
 
 inc.resid3 = resid;
+inc.totSqResidAll3 = norm(absresid(:,1).*absresid(:,1),1);
+inc.weights3 = w;
+inc.w03 = w0;
+
 if mgood > 0
     inc.totSqResidTru3 = norm(absresid(1:mgood,1).*absresid(1:mgood,1),1);
     inc.RMSETru3 = sqrt(inc.totSqResidTru3);
@@ -299,13 +318,10 @@ if mgood > 0
     inc.TSEstar3 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
     fprintf("  TSEstar %f.\n",inc.TSEstar3)
 end
-inc.totSqResidAll3 = norm(absresid(:,1).*absresid(:,1),1);
 if maxResid > 0
     inc.numCloseAll3 = sum(absresid(:,1) <= maxResid);
     fprintf("  %d close points.\n",inc.numCloseAll3)
 end
-inc.weights3 = w;
-inc.w03 = w0;
 
 if maxResid == 0
    % Just return the third regression
@@ -320,7 +336,6 @@ if maxResid == 0
        inc.MSETruOut = inc.MSETru3;
        inc.MAETruOut = inc.MAETru3;
        inc.TSEstarOut = inc.TSEstar3;
-       fprintf("  TSEstar %f.\n",inc.TSEstarOut)
    end
 end
 
@@ -340,16 +355,11 @@ if maxResid ~= 0
             inc.MSETruOut = inc.MSETru3;
             inc.MAETruOut = inc.MAETru3;
             inc.TSEstarOut = inc.TSEstar3;
-            fprintf("  TSEstar %f.\n",inc.TSEstarOut)
-        end
-        if maxResid ~= 0
-            fprintf("  %d close points\n",inc.numCloseAllOut)
         end
     end
 end
 
 inc.solTime = toc;
-
 fprintf("Output solution from Step %d\n",outStep)
 if mgood > 0
     fprintf("  TSEstar %f\n",inc.TSEstarOut);
@@ -361,27 +371,39 @@ end
 % Calculate the estimated number of inliers at output (inc.qout)
 outliers = isoutlier(abs(inc.residOut));
 inc.qout = m - sum(outliers);
+% Calculate outlier fractions at final fit
+if mgood > 0
+    inc.FinalFracInOut = sum(outliers(1:mgood)/mgood);
+    inc.FinalFracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
+end
 
 return
 end
 
 % -------------------------------------------------------------------------
-% Analyzes the input data set to identify outliers.
-% Looks along the columns as well as along the columns of the principal
-% components. Finds the largest relative distance from the median distance
-% to the median for each point in the 2n columns mentioned. Uses an offset
+% Analyzes the input data set to identify outliers in regression data sets.
+% Use a robust measure on:
+%   (i) the independent variable columns (A), 
+%   (ii) the dependent variable column (y). 
+%   (iii) the independent variable columns when A is converted by a PCA, 
+%   (iv) the dependent variable residuals when y and A are multiply regressed. 
+% The robust measure scales the relative distance from the median distance
+% to the median for each point in each analysis above. Uses an offset
 % in case the median (used as a denominator) is zero, or close to it.
 % if mgood > 0 then it returns measures on the accuracy of identifying
 % outliers.
 % INPUTS:
-%   A: data matrix
-%   mgood: number of non-outliers, if known, in which case you get
+%   A: data matrix for independent variables
+%   y: vector of dependent variable values
+%   absresid: vector of absolute residuals for the multiple regression
+%     over A and y
+%   mgood: number of non-outliers, if known, in which case 
 %          statistics are generated on how accurate the outlier
 %          identification is. If mgood <= 0, or mgood >= m, then no such
 %          statistics are generated. This is for testing purposes.
 % OUTPUTS: these are all fields in outMeasure
 %   .max: the maximum relative distance from the median, in medians, in any
-%         axis, including the original variables and the PCA axes
+%         of (i) through (iv) above, for each point
 %   .TF: mx1 logical vector listing points identified as outliers
 %   .count: total number of points identified as outliers
 %   .q: the estimated number of inliers
@@ -390,14 +412,18 @@ end
 %     .outTruFrac: fraction of nonoutlier points identified as outliers
 %     .outOut: number of outlier points identified as outliers
 %     .outOutFrac: fraction of outlier points identified as outliers
-function [outMeasure] = outFinder(A,mgood)
+function [outMeasure] = outFinderReg(A,y,absresid,mgood)
 m = size(A,1);
 n = size(A,2);
 outMeasure.max = zeros(m,1) - Inf;
+outMeasure.numZeroMedians = 0;
 
-% Axis-aligned hyperplanes
+% columns of the independent variable matrix A
 for j=1:n
     absDiffs = abs(A(:,j) - median(A(:,j)));
+    if median(absDiffs) < 1.0e-6
+        outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
+    end
     % Offset in case of zero median
     fracDiffs = absDiffs/(median(absDiffs)+1);
     for i=1:m
@@ -407,16 +433,44 @@ for j=1:n
     end
 end
 
-% principal component axes
+% principal component axes of the independent variable matrix A
 [~,score,~] = pca(A);
 for j=1:size(score,2)
     absDiffs = abs(score(:,j) - median(score(:,j)));
+    if median(absDiffs) < 1.0e-6
+        outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
+    end
     % Offset in case of zero median
     fracDiffs = absDiffs/(median(absDiffs)+1);
     for i=1:m
         if fracDiffs(i,1) > outMeasure.max(i,1)
             outMeasure.max(i,1) = fracDiffs(i,1);
         end
+    end
+end
+
+% the dependent variable vector y column
+absDiffs = abs(y - median(y));
+if median(absDiffs) < 1.0e-6
+    outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
+end
+% Offset in case of zero median
+fracDiffs = absDiffs/(median(absDiffs)+1);
+for i=1:m
+    if fracDiffs(i,1) > outMeasure.max(i,1)
+        outMeasure.max(i,1) = fracDiffs(i,1);
+    end
+end
+
+% absolute residuals based on initial regression
+if median(absresid) < 1.0e-6
+    outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
+end
+% Offset in case of zero median
+fracDiffs = absresid/(median(absresid)+1);
+for i=1:m
+    if fracDiffs(i,1) > outMeasure.max(i,1)
+        outMeasure.max(i,1) = fracDiffs(i,1);
     end
 end
 
