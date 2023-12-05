@@ -9,6 +9,11 @@ loc="/home/jpbrooks/HPFit/experiments/cb_evaluation/results"
 folnames = ["bm-like", "bm-nox", "clustered_outliers", "olive", "rvd-like", "unclustered_outliers", "bm", "rvd", "clustered_outliers_small", "bm_small"]
 reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small"]
 gen_names = ["clustered_outliers", "unclustered_outliers", "clustered_outliers_small"]
+
+folnames = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small", "clustered_outliers"]
+reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small"]
+gen_names = ["clustered_outliers"]
+
 experiments=["evaluation"]
 for experiment in experiments:
     writer = pd.ExcelWriter(loc + "/" + experiment + ".xlsx", mode="w")
@@ -32,7 +37,8 @@ for experiment in experiments:
                 if formulation in ["alg3PCA", "cb"]:
                     results[dataset][formulation + " runtime"]=float(line1[9])
                     results[dataset][formulation + " tsestar"]=float(line1[10])
-                elif formulation in ["arob", "bb", "hbreg", "lm", "lts", "lqs"]:
+                elif formulation in ["arob", "bb", "hbreg", "lm", "pca", "lts", "lqs", "mh", "mm", "rewlse"]:
+                    print(line1)
                     results[dataset][formulation + " runtime"]=float(line1[11])
                     results[dataset][formulation + " gamma"]=float(line1[8])
                     results[dataset][formulation + " tsestar"]=float(line1[12])
@@ -61,9 +67,15 @@ for experiment in experiments:
         #    results_df["alg3PCA gamma"] = np.nan
         #    results_df["alg3PCA Dnon"] = np.nan
         #    results_df["alg3PCA LTS"] = np.nan
-        results_df = results_df[["i","m","n","m_normal","q",
-                             "alg3PCA runtime", "arob runtime","bb runtime","hbreg runtime", "lm runtime","lts runtime","lqs runtime", "cb runtime",
-                             "alg3PCA tsestar", "arob tsestar","bb tsestar","hbreg tsestar", "lm tsestar","lts tsestar","lqs tsestar", "cb tsestar", "bnd2"]]
+        if folname in gen_names:
+            results_df = results_df[["i","m","n","m_normal","q",
+                             "alg3PCA runtime", "arob runtime","bb runtime","hbreg runtime", "lm runtime","pca runtime", "lts runtime","lqs runtime", "mh runtime", "mm runtime", "rewlse runtime", "cb runtime",
+                             "alg3PCA tsestar", "arob tsestar","bb tsestar","hbreg tsestar", "lm tsestar","pca tsestar", "lts tsestar","lqs tsestar", "mh tsestar", "mm tsestar", "rewlse tsestar", "cb tsestar", "bnd2"]]
+        else:
+            results_df = results_df[["i","m","n","m_normal","q",
+                             "alg3PCA runtime", "arob runtime","bb runtime","hbreg runtime", "lm runtime","lts runtime","lqs runtime", "mh runtime", "mm runtime", "rewlse runtime", "cb runtime",
+                             "alg3PCA tsestar", "arob tsestar","bb tsestar","hbreg tsestar", "lm tsestar","lts tsestar","lqs tsestar", "mh tsestar", "mm tsestar", "rewlse tsestar", "cb tsestar", "bnd2"]]
+
         hbreg_fail = []
         for dataset in results.keys():
             if ("lm runtime" in results[dataset]) and ("cb runtime" not in results[dataset]):
@@ -75,13 +87,16 @@ for experiment in experiments:
         fail_file.close()
            
     
-        methods= ["alg3PCA", "arob","bb","hbreg", "lm","lts","lqs", "cb"]
+        if folname in gen_names:
+            methods= ["alg3PCA", "arob","bb","hbreg", "lm","pca","lts","lqs", "cb", "mh", "mm", "rewlse"]
+        else:
+            methods= ["alg3PCA", "arob","bb","hbreg", "lm","lts","lqs", "cb", "mh", "mm", "rewlse"]
         ltscols = [m + " tsestar" for m in methods]
         results_df[ltscols] = results_df[ltscols].astype(float) 
         results_df["best"] = results_df[ltscols].min(axis=1)
 
         ratiocols = [m + " Ratio" for m in methods]
-        results_df[ratiocols] = results_df[ltscols].div(results_df["best"], axis=0)
+        results_df[ratiocols] = results_df[ltscols].div(results_df["bnd2"], axis=0)
         results_df.sort_values(by=["i"], inplace=True)
         #new_row = [np.nan for i in range(len(results_df.columns))]
         #gmeans = scipy.stats.gmean(results_df[ratiocols],axis=0)

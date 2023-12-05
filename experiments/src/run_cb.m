@@ -47,8 +47,8 @@
 function [beta_star, f_beta_star] = run_cb(iteration, datafname, q, m_normal, dep_var, resloc) 
 
 inParam.mgood = m_normal;
-inParam.maxDist = -16;
-inParam.maxResid = -16;
+inParam.maxDist = -50;
+inParam.maxResid = -50;
 
 
 disp("running cb")

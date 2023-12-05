@@ -49,7 +49,7 @@ out_file = fopen(out_fname, 'w');
 
 tStart = tic;
 if dep_var == true
-    qparams.maxResid = -16;
+    qparams.maxResid = -50;
     y = X(:,1); % first column is response
     A = X(:,2:n);
     [output, inc] = CBqreg(y, A, qparams) % regression version
@@ -57,7 +57,7 @@ if dep_var == true
     cbq_beta = [-1.0;  output.w0; output.w];
     cbq_beta
 else 
-    qparams.maxDist = -16;
+    qparams.maxDist = -50;
     [output, inc] = CBqgen(X, qparams) % general version
     cbq_beta = [-output.RHS; output.weights];
     cbq_beta = (cbq_beta/cbq_beta(1,1))*n
