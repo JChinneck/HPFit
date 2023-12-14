@@ -1,4 +1,4 @@
-% December 5, 2023
+% December 14, 2023
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -7,12 +7,14 @@
 % This function fits a regression hyperplane to a set of data points to
 % heuristically maximize the number of calculated points that are close to
 % the given output points.
-%   It uses a 3 step process: (1) regress on the complete data
+%   It uses a 4 step process: (1) regress on the complete data
 % set (and perhaps use it to caculate the maximum residual to a "close"
-% point), (2) remove outliers using a new process and regress a 2nd
+% point), (2) remove outliers using a robust process and regress a 2nd
 % hyperplane, (3) reinstate any points whose output residuals are not 
-% outliers relative to the 2nd hyperplane and place a 3rd and final
-% hyperplane.
+% outliers relative to the 2nd hyperplane, and remove any that are, and 
+% regress a 3rd hyperplane, (4) repeat the last step relative to the 3rd 
+% hyperplane and regress a 4th hyperplane. The Absolute Better Method may
+% choose which of the 4 hyperplanes to output.
 % INPUTS:
 %   y: the output variable values
 %   Aorig: the original data matrix (points x predictor variables)
@@ -32,7 +34,7 @@
 %                   best hyperplane to output.
 %              > 0: used as an actual residual value to define maxResid
 %                   which defines close points.
-% OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
+% OUTPUTS: these are all fields of inc. [x] has values 1,2,3,4,Out
 %     .status: -1: failure, 0: OK, 1: exact solution (usually because m=n)
 %     .maxResid: the final value of maxResid, points with residuals smaller
 %       than this are counted as "close"
@@ -63,7 +65,7 @@
 %      .MSETru[x]: mean squared residual for the mgood points
 %      .MAETru[x]: mean absolute residual for the mgood points
 
-function [inc] = CBreg(y,Aorig,inParam)
+function [inc] = CBreg2023(y,Aorig,inParam)
 inc.status = 0;
 
 if isfield(inParam,'mgood') == 1
@@ -75,7 +77,7 @@ if isfield(inParam,'maxResid') == 1
     maxResid = inParam.maxResid;
 else
     % default to the recommended value
-    maxResid = -16;
+    maxResid = -50;
 end
 fprintf("Input parameters:\n")
 fprintf("  maxResid %f\n",maxResid)
@@ -109,7 +111,8 @@ end
 % so a column of ones is added at the beginning of Aorig
 A = [ones(m,1),Aorig];
 
-% Initial regression solution for the original dataset --------------------
+%--------------------------------------------------------------------------
+% Initial regression solution for the original dataset
 
 fprintf("Initial regression on all %d points.\n",m)
 inc.m1 = m;
@@ -145,7 +148,7 @@ inc.maxResid = maxResid; % record the final value of maxResid
 inc.resid1 = resid;
 if mgood > 0
     if maxResid >= 0
-        inc.numCloseTru1 = sum(absresid(1:mgood,1) < maxResid);
+        inc.numCloseTru1 = sum(absresid(1:mgood,1) <= maxResid);
         inc.numCloseTruOut = inc.numCloseTru1;
     end
     inc.totSqResidTru1 = norm(absresid(1:mgood,1).*absresid(1:mgood,1),1);
@@ -182,9 +185,10 @@ inc.w0Out = inc.w01;
 inc.residOut = inc.resid1;
 inc.totSqResidAllOut = inc.totSqResidAll1;
 
-% Analyze and remove outliers ---------------------------------------------
+%--------------------------------------------------------------------------
+% Analyze and remove outliers and place HP2
 
-[OM] = outFinderReg(Aorig,y,absresid,mgood);
+[OM] = outFinderReg(Aorig,y,mgood);
 
 inc.q = OM.q;
 inc.numZeroMedians = OM.numZeroMedians;
@@ -259,7 +263,8 @@ if maxResid ~= 0
     end
 end
 
-% Reinstate any nonoutliers and regress again -----------------------------
+%--------------------------------------------------------------------------
+% Reinstate any nonoutliers and regress again to get HP3
 
 outliers = isoutlier(absresid);
 % Make sure there are at least norig points left for the final fit
@@ -273,8 +278,8 @@ end
 
 % Calculate outlier fractions at this stage (step 5)
 if mgood > 0
-    inc.step5FracInOut = sum(outliers(1:mgood)/mgood);
-    inc.step5FracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
+    inc.HP3FracInOut = sum(outliers(1:mgood)/mgood);
+    inc.HP3FracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
 end
    
 B = zeros(m,norig);
@@ -359,10 +364,115 @@ if maxResid ~= 0
     end
 end
 
+%--------------------------------------------------------------------------
+% Check phase: repeat the outlier reinstatement and removal and try again
+
+outliers = isoutlier(absresid);
+% Make sure there are at least norig points left for the final fit
+if m - sum(outliers) < norig
+    outliers = zeros(m,1);
+    sortedabsResid = sortrows([(1:m)',absresid],2,'descend');
+    for i = 1:(m-norig)
+        outliers(sortedabsResid(i,1),1) = 1;
+    end
+end
+
+% Calculate outlier fractions at this stage
+if mgood > 0
+    inc.HP4FracInOut = sum(outliers(1:mgood)/mgood);
+    inc.HP4FracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
+end
+   
+B = zeros(m,norig);
+y1 = zeros(m,1);
+icount = 0;
+for i=1:m
+    if ~outliers(i,1)
+        icount = icount + 1;
+        B(icount,:) = Aorig(i,:);
+        y1(icount,1) = y(i,1);
+    end
+end
+B = B(1:icount,:);
+y1 = y1(1:icount,1);
+inc.m4 = icount;
+fprintf("Check phase: %d points.\n",icount)
+
+% Get the regression solution
+A = [ones(icount,1),B];
+beta = regress(y1,A);
+w0 = beta(1,1);
+w = beta(2:norig+1,1);
+resid = w0 + Aorig*w - y;
+absresid = abs(resid);
+
+inc.resid4 = resid;
+inc.totSqResidAll4 = norm(absresid(:,1).*absresid(:,1),1);
+inc.weights4 = w;
+inc.w04 = w0;
+
+if mgood > 0
+    inc.totSqResidTru4 = norm(absresid(1:mgood,1).*absresid(1:mgood,1),1);
+    inc.RMSETru4 = sqrt(inc.totSqResidTru4);
+    inc.MSETru4 = inc.totSqResidTru4/mgood;
+    inc.MAETru4 = sum(abs(absresid(1:mgood,1)))/mgood;
+    if maxResid > 0
+        inc.numCloseTru4 = sum(absresid(1:mgood,1) <= maxResid);
+    end
+    % Calculate TSEstar
+    sortedabsResid = sort(absresid);
+    inc.TSEstar4 = norm(sortedabsResid(1:mgood,1).*sortedabsResid(1:mgood,1),1);
+    fprintf("  TSEstar %f.\n",inc.TSEstar4)
+end
+if maxResid > 0
+    inc.numCloseAll4 = sum(absresid(:,1) <= maxResid);
+    fprintf("  %d close points.\n",inc.numCloseAll4)
+end
+
+if maxResid == 0
+   % Just return the 4th regression
+   outStep = 4;
+   inc.weightsOut = inc.weights4;
+   inc.w0Out = inc.w04;
+   inc.residOut = inc.resid4;
+   inc.totSqResidAllOut = inc.totSqResidAll4;
+   if mgood > 0
+       inc.totSqResidTruOut = inc.totSqResidTru4;
+       inc.RMSETruOut = inc.RMSETru4;
+       inc.MSETruOut = inc.MSETru4;
+       inc.MAETruOut = inc.MAETru4;
+       inc.TSEstarOut = inc.TSEstar4;
+   end
+end
+
+%Update output solution if appropriate
+if maxResid ~= 0
+    if inc.numCloseAll4 >= inc.numCloseAllOut
+        outStep = 4;
+        inc.weightsOut = inc.weights4;
+        inc.w0Out = inc.w04;
+        inc.residOut = inc.resid4;
+        inc.totSqResidAllOut = inc.totSqResidAll4;
+        inc.numCloseAllOut = inc.numCloseAll4;
+        if mgood > 0
+            inc.totSqResidTruOut = inc.totSqResidTru4;
+            inc.numCloseTruOut = inc.numCloseTru4;
+            inc.RMSETruOut = inc.RMSETru4;
+            inc.MSETruOut = inc.MSETru4;
+            inc.MAETruOut = inc.MAETru4;
+            inc.TSEstarOut = inc.TSEstar4;
+        end
+    end
+end
+
+%--------------------------------------------------------------------------
+% Collate the final output
+
 inc.solTime = toc;
 fprintf("Output solution from Step %d\n",outStep)
 if mgood > 0
     fprintf("  TSEstar %f\n",inc.TSEstarOut);
+    fprintf("  R %f\n",inc.TSEstarOut/inc.bnd2);
 end
 if maxResid ~= 0
     fprintf("  %d close points\n",inc.numCloseAllOut);
@@ -380,23 +490,28 @@ end
 return
 end
 
-% -------------------------------------------------------------------------
-% Analyzes the input data set to identify outliers in regression data sets.
-% Use a robust measure on:
-%   (i) the independent variable columns (A), 
-%   (ii) the dependent variable column (y). 
-%   (iii) the independent variable columns when A is converted by a PCA, 
-%   (iv) the dependent variable residuals when y and A are multiply regressed. 
-% The robust measure scales the relative distance from the median distance
-% to the median for each point in each analysis above. Uses an offset
-% in case the median (used as a denominator) is zero, or close to it.
-% if mgood > 0 then it returns measures on the accuracy of identifying
+%==========================================================================
+% Analyzes the input data set to robustly identify outliers in regression 
+% data sets.
+%   Step 1 identifies outliers in the independent variables by looking
+% for outliers in the original independent variable columns and then in
+% the revised independent variable columns after a PCA transformation. A
+% robust measure takes the largest value of the two and then looks for an
+% abrupt change signalling the division between inliers and outliers.
+%   Step 2 identifies outliers in the dependent variable. This can only be
+% done by looking at the residuals relative to a regression fit. We use the
+% residuals from the regression obtained over the set of inlier points 
+% identified in Step 1.
+%   Finally, we return the combined set of outliers identified in Steps 1
+% and 2.
+%   The robust measure in Step 1 scales the relative distance from the 
+% median distance to the median for each point in each analysis above. Uses
+% an offset in case the median (used as a denominator) is zero, or close.
+%   If mgood > 0 then it returns measures on the accuracy of identifying
 % outliers.
 % INPUTS:
 %   A: data matrix for independent variables
 %   y: vector of dependent variable values
-%   absresid: vector of absolute residuals for the multiple regression
-%     over A and y
 %   mgood: number of non-outliers, if known, in which case 
 %          statistics are generated on how accurate the outlier
 %          identification is. If mgood <= 0, or mgood >= m, then no such
@@ -412,7 +527,7 @@ end
 %     .outTruFrac: fraction of nonoutlier points identified as outliers
 %     .outOut: number of outlier points identified as outliers
 %     .outOutFrac: fraction of outlier points identified as outliers
-function [outMeasure] = outFinderReg(A,y,absresid,mgood)
+function [outMeasure] = outFinderReg(A,y,mgood)
 m = size(A,1);
 n = size(A,2);
 outMeasure.max = zeros(m,1) - Inf;
@@ -449,33 +564,7 @@ for j=1:size(score,2)
     end
 end
 
-% the dependent variable vector y column
-absDiffs = abs(y - median(y));
-if median(absDiffs) < 1.0e-6
-    outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
-end
-% Offset in case of zero median
-fracDiffs = absDiffs/(median(absDiffs)+1);
-for i=1:m
-    if fracDiffs(i,1) > outMeasure.max(i,1)
-        outMeasure.max(i,1) = fracDiffs(i,1);
-    end
-end
-
-% absolute residuals based on initial regression
-if median(absresid) < 1.0e-6
-    outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
-end
-% Offset in case of zero median
-fracDiffs = absresid/(median(absresid)+1);
-for i=1:m
-    if fracDiffs(i,1) > outMeasure.max(i,1)
-        outMeasure.max(i,1) = fracDiffs(i,1);
-    end
-end
-
-% Use the first abrupt change value in sorted outMeasure.max after the 
-% starting point to identify outliers
+% remove outliers in the independent variables
 sortedMax = sort(outMeasure.max);
 changes = ischange(sortedMax,'linear');
 % Set initial defaults for the cutoff value. If there is no abrupt change
@@ -488,17 +577,76 @@ else
     istart = ceil(m/2);
     cutoff = sortedMax(istart,1);
 end
-outMeasure.q = istart - 1;
- 
 for i = istart:m
     if changes(i,1)
         cutoff = sortedMax(i,1);
-        outMeasure.q = i-1;
         break
     end
 end
-outMeasure.TF = outMeasure.max >= cutoff;
+indOutliers = outMeasure.max >= cutoff;
+% eliminate those outliers and refit the PCA
+B = zeros(m,n);
+y1 = zeros(m,1);
+row = zeros(m,1);
+icount = 0;
+for i=1:m
+    if ~indOutliers(i,1)
+        icount = icount + 1;
+        B(icount,:) = A(i,:);
+        y1(icount,1) = y(i,1);
+        row(icount,1) = i;
+    end
+end
+B = B(1:icount,:);
+y1 = y1(1:icount,1);
+row = row(1:icount,1);
+
+% regress on the subset and see residuals over all points
+A1 = [ones(icount,1),B];
+beta = regress(y1,A1);
+w0 = beta(1,1);
+w = beta(2:n+1,1);
+resid = w0 + A*w - y;
+absresid = abs(resid);
+
+% get the subset of residuals for the included points
+absresidSub = absresid(indOutliers == 0,1);
+% look for outliers or breakpoints
+sortedARS = sort(absresidSub);
+changes = ischange(sortedARS,'linear');
+% Set initial defaults for the cutoff value. If there is no abrupt change
+% then the default cutoff values are used.
+if m/n <= 2
+    % Can't start at m/2 or we don't leave enough points for PCA to run
+    istart = n + 1;
+    cutoff = sortedMax(istart,1);
+else
+    istart = ceil(m/2);
+    if istart > size(sortedARS,1)
+        cutoff = size(sortedARS,1);
+    else
+        cutoff = sortedARS(istart,1);
+    end
+end
+for i = istart:size(absresidSub,1)
+    if changes(i,1)
+        cutoff = sortedARS(i,1);
+        break
+    end
+end
+depOutliers = absresidSub >= cutoff;
+
+% Create one outlier list from the dependent and independent outliers
+outliers = indOutliers;
+for i=1:size(depOutliers,1)
+    if depOutliers(i,1)
+        outliers(row(i,1),1) = 1;
+    end
+end
+
+outMeasure.TF = outliers;
 outMeasure.count = sum(outMeasure.TF);
+outMeasure.q = m - outMeasure.count;
 
 % if mgood is nonzero, then calculate some accuracy measures
 if (mgood > 0) && (mgood < m) 
