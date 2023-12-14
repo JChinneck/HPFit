@@ -1,4 +1,4 @@
-% December 13, 2022
+% December 14, 2023
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -6,11 +6,14 @@
 
 % This function fits a hyperplane to a set of data points in a way that
 % heuristically maximizes the number of points that are "close" to it. It
-% uses a 3 step process: (1) fit a first hyperplane to the complete data
+% uses a 4 step process: (1) fit a first hyperplane to the complete data
 % set (and perhaps use it to caculate the maximum distance to a "close"
-% point), (2) remove outliers using a new process and find a 2nd
+% point), (2) remove outliers using a new robust process and find a 2nd
 % hyperplane, (3) reinstate any points that are not outliers relative to
-% the 2nd hyperplane and place a 3rd and final hyperplane.
+% the 2nd hyperplane and remove any that are and place a 3rd hyperplane, 
+% (4) repeat the last step for outliers relative to the 3rd hyperplane and 
+% place the 4th and final hyperplane.
+%    The Absolute Better Method may override the final hyperplane choice.
 % INPUTS:
 %   Aorig: the original data matrix (points x variables)
 %   inParam: input parameters:
@@ -23,12 +26,12 @@
 %              There are 3 cases:
 %              < 0: -maxDist is the percentile of distances from the first
 %                   hyperplane. Note it is in %. 
-%                   NOTE: maxDist = -16 IS HIGHLY RECOMMENDED.
-%                   If maxDist is not specified, then -16 is used.
+%                   NOTE: maxDist = -50 IS HIGHLY RECOMMENDED.
+%                   If maxDist is not specified, then -50 is used.
 %              = 0: means that closeAll is not used to help identify the
 %                   best hyperplane. Result is just the 3rd hyperplane.
 %              > 0: an actual Euclidean distance to define maxDist.
-% OUTPUTS: these are all fields of inc. [x] has values 1,2,3,Out
+% OUTPUTS: these are all fields of inc. [x] has values 1,2,3,4,Out
 %     .status: -1: failure, 0: OK, 1: exact solution (usually because m=n)
 %     .maxDist: the final value of maxDist, points closer than maxDist to
 %       a hyperplane are counted as being "close" to it 
@@ -51,23 +54,27 @@
 %        hyperplanes. This is the same as "trimmed squared error" for 
 %        mgood points. Note that it isn't necessarily the mgood non-outlier 
 %        points identified on input, just mgood points in total.
-%      .bnd2: this is a tight upper bound on the best possible TSEstar value,
+%      .bnd2: this is an upper bound on the best possible TSEstar value,
 %        calculated by fitting the PCA to only the mgood points and then
 %        calculating the TSEstar for those points. 
 
-function [inc] = CBgen(Aorig,inParam)
+function [inc] = CBgen2023(Aorig,inParam)
 inc.status = 0;
 
 fprintf("Input parameters:\n");
-fprintf("  mgood %d\n",inParam.mgood)
-fprintf("  maxDist %f\n",inParam.maxDist)
-maxDist = inParam.maxDist;
 % mgood is the number of inliers, if known (useful for testing purposes)
 if isfield(inParam,'mgood') == 1
     mgood = inParam.mgood;
 else
     mgood = 0;
 end
+fprintf("  mgood %d\n",inParam.mgood)
+if isfield(inParam,'maxDist') == 1
+    maxDist = inParam.maxDist;
+else
+    maxDist = -50;
+end
+fprintf("  maxDist %f\n",inParam.maxDist)
 
 tic;
 
@@ -86,15 +93,17 @@ if m < norig
     return
 end
 
-
 % Print some stats to console
 if mgood > 0
-    fprintf("  Stats: mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
+    fprintf("  Stats: mgood %d mtot %d n %d mout %d mtot/n %f outFrac %f\n",...
+        mgood,m,norig,m-mgood,m/norig,(m-mgood)/m)
 else
     fprintf("  Stats: mtot %d n %d mtot/n %f\n",m,norig,m/norig)
 end
 
-% initial PCA solution for the original dataset ---------------------------
+%--------------------------------------------------------------------------
+% initial PCA solution for the original dataset (HP1)
+
 fprintf("Initial PCA on all %d points.\n",m)
 inc.m1 = m;
 [weights,RHS] = getPCAHP(Aorig);
@@ -113,6 +122,7 @@ if max(edist) < 1.0e-6
     inc.edistOut = edist;
     inc.bnd2 = 0;
     inc.status = 1;
+    inc.outStep = 1;
     return
 end
 
@@ -138,8 +148,9 @@ inc.RHSOut = inc.RHS1;
 
 if mgood > 0
     inc.totSqDistTru1 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
+    inc.totSqDistTruOut = inc.totSqDistTru1;
     if maxDist ~= 0
-        inc.closeTru1 = sum(edist(1:mgood,1) < maxDist);
+        inc.closeTru1 = sum(edist(1:mgood,1) <= maxDist);
     end
     % Calculate TSEstar, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
@@ -155,12 +166,15 @@ if mgood > 0
     inc.bnd2 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
     fprintf("  bnd2: %f\n",inc.bnd2)
 end
-outStep = 1;
+inc.outStep = 1;
 
-% Analyze and remove outliers ---------------------------------------------
+%--------------------------------------------------------------------------
+% Analyze and remove outliers, then create HP2
+
 % outFinder removes no more than mtot-n points, so that PCA can run
 [OM] = outFinder(Aorig,mgood);
 inc.q = OM.q;
+inc.numZeroMedians = OM.numZeroMedians;
 B = zeros(m,norig);
 icount = 0;
 for i=1:m
@@ -195,7 +209,7 @@ if mgood > 0
     inc.outOutFrac = OM.outOutFrac;
     inc.totSqDistTru2 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
     if maxDist ~= 0
-        inc.closeTru2 = sum(edist(1:mgood,1) < maxDist);
+        inc.closeTru2 = sum(edist(1:mgood,1) <= maxDist);
     end
     % Calculate TSEstar, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
@@ -206,7 +220,7 @@ end
 % Update output solution if appropriate
 if maxDist ~= 0
     if inc.closeAll2 > inc.closeAll1
-        outStep = 2;
+        inc.outStep = 2;
         inc.closeAllOut = inc.closeAll2;
         inc.weightsOut = inc.weights2;
         inc.RHSOut = inc.RHS2;
@@ -219,7 +233,9 @@ if maxDist ~= 0
     end
 end
 
-% Reinstate any nonoutliers and find HP again -----------------------------
+%--------------------------------------------------------------------------
+% Reinstate any nonoutliers and find HP3
+
 % Too many points are sometimes removed for PCA to run, so guard against
 outliers = isoutlier(edist);
 if m - sum(outliers) < norig
@@ -228,6 +244,12 @@ if m - sum(outliers) < norig
     for i = 1:(m-norig)
         outliers(sortededist(i,1),1) = 1;
     end
+end
+
+% Calculate outlier fractions at this stage
+if mgood > 0
+    inc.HP3FracInOut = sum(outliers(1:mgood)/mgood);
+    inc.HP3FracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
 end
    
 B = zeros(m,norig);
@@ -261,7 +283,7 @@ inc.RHS3 = RHS;
 if mgood > 0
     inc.totSqDistTru3 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
     if maxDist ~= 0
-        inc.closeTru3 = sum(edist(1:mgood,1) < maxDist);
+        inc.closeTru3 = sum(edist(1:mgood,1) <= maxDist);
     end
     % Calculate TSEstar, the sum of the mgood smallest squared errors
     sortededist = sort(edist);
@@ -272,7 +294,7 @@ end
 % Update output solution if appropriate
 if maxDist ~= 0
     if inc.closeAll3 >= max(inc.closeAll1,inc.closeAll2)
-        outStep = 3;
+        inc.outStep = 3;
         inc.closeAllOut = inc.closeAll3;
         inc.weightsOut = inc.weights3;
         inc.RHSOut = inc.RHS3;
@@ -286,7 +308,7 @@ if maxDist ~= 0
 end
 
 if maxDist == 0
-    outStep = 3;
+    inc.outStep = 3;
     inc.weightsOut = inc.weights3;
     inc.RHSOut = inc.RHS3;
     inc.totSqDistAllOut = inc.totSqDistAll3;
@@ -296,9 +318,102 @@ if maxDist == 0
     end
 end
 
+%--------------------------------------------------------------------------
+% Check phase. Remove outliers again and find HP4.
+
+% Avoid removing too many points. We need m for PCA to run
+outliers = isoutlier(edist);
+if m - sum(outliers) < norig
+    outliers = zeros(m,1);
+    sortededist = sortrows([(1:m)',edist],2,'descend');
+    for i = 1:(m-norig)
+        outliers(sortededist(i,1),1) = 1;
+    end
+end
+
+% Calculate outlier fractions at this stage
+if mgood > 0
+    inc.HP4FracInOut = sum(outliers(1:mgood)/mgood);
+    inc.HP4FracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
+end
+   
+B = zeros(m,norig);
+mB = 0;
+for i=1:m
+    if ~outliers(i,1)
+        mB = mB + 1;
+        B(mB,:) = Aorig(i,:);
+    end
+end
+B = B(1:mB,:);
+inc.m4 = mB;
+fprintf("Check phase: %d points\n",mB)
+
+% Get the PCA solution
+[weights,RHS] = getPCAHP(B);
+% Calculate the point distances from the hyperplane
+dist = Aorig*weights - RHS;
+% Calculate the Euclidean point distances from the hyperplane
+gradLen = norm(weights);
+edist = abs(dist/gradLen);
+
+inc.totSqDistAll4 = norm(edist(:,1).*edist(:,1),1);
+if maxDist ~= 0
+    inc.closeAll4 = sum(edist <= maxDist);
+    fprintf("  %d close points\n",inc.closeAll4)
+end
+inc.weights4 = weights;
+inc.RHS4 = RHS;
+
+if mgood > 0
+    inc.totSqDistTru4 = norm(edist(1:mgood,1).*edist(1:mgood,1),1);
+    if maxDist ~= 0
+        inc.closeTru4 = sum(edist(1:mgood,1) <= maxDist);
+    end
+    % Calculate TSEstar, the sum of the mgood smallest squared errors
+    sortededist = sort(edist);
+    inc.TSEstar4 = norm(sortededist(1:mgood,1).*sortededist(1:mgood,1),1);
+    fprintf("  TSEstar %f\n",inc.TSEstar4)
+end
+
+% Update output solution if appropriate
+if maxDist ~= 0
+    if inc.closeAll4 >= inc.closeAllOut
+        inc.outStep = 4;
+        inc.closeAllOut = inc.closeAll4;
+        inc.weightsOut = inc.weights4;
+        inc.RHSOut = inc.RHS4;
+        inc.totSqDistAllOut = inc.totSqDistAll4;
+        if mgood > 0
+            inc.TSEstarOut = inc.TSEstar4;
+            inc.totSqDistTruOut = inc.totSqDistTru4;
+            inc.closeTruOut = inc.closeTru4;
+        end
+    end
+end
+
+if maxDist == 0
+    inc.outStep = 4;
+    inc.weightsOut = inc.weights4;
+    inc.RHSOut = inc.RHS4;
+    inc.totSqDistAllOut = inc.totSqDistAll4;
+    if mgood > 0
+        inc.TSEstarOut = inc.TSEstar4;
+        inc.totSqDistTruOut = inc.totSqDistTru4;
+    end
+end
+
+%--------------------------------------------------------------------------
+% Collate and print final solution 
+
 inc.solTime = toc;
 
-fprintf("Final solution from Step %d.\n",outStep)
+fprintf("Final solution from HP %d.",inc.outStep)
+if inc.outStep ~= 4
+    fprintf(" ABM active.\n")
+else
+    fprintf(" ABM inactive.\n")
+end
 if maxDist ~= 0
     fprintf("  %d close points\n",inc.closeAllOut)
 end
@@ -314,10 +429,15 @@ gradLen = norm(inc.weightsOut);
 edist = abs(dist/gradLen);
 outliers = isoutlier(edist);
 inc.qout = m - sum(outliers);
+% Calculate outlier fractions at final fit
+if mgood > 0
+    inc.FinalFracInOut = sum(outliers(1:mgood)/mgood);
+    inc.FinalFracOutOut = sum(outliers(mgood+1:m)/(m-mgood));
+end
 
 return
 end
-% -------------------------------------------------------------------------
+% =========================================================================
 % Analyzes the input data set to identify outliers.
 % Looks along the columns as well as along the columns of the principal
 % components. Finds the largest relative distance from the median distance
@@ -345,11 +465,15 @@ end
 function [outMeasure] = outFinder(A,mgood)
 m = size(A,1);
 n = size(A,2);
+outMeasure.numZeroMedians = 0;
 outMeasure.max = zeros(m,1) - Inf;
 
 % Axis-aligned hyperplanes
 for j=1:n
     absDiffs = abs(A(:,j) - median(A(:,j)));
+    if median(absDiffs) < 1.0e-6
+        outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
+    end
     % Offset in case of zero median
     fracDiffs = absDiffs/(median(absDiffs)+1);
     for i=1:m
@@ -363,6 +487,9 @@ end
 [~,score,~] = pca(A);
 for j=1:n
     absDiffs = abs(score(:,j) - median(score(:,j)));
+    if median(absDiffs) < 1.0e-6
+        outMeasure.numZeroMedians = outMeasure.numZeroMedians + 1;
+    end
     % Offset in case of zero median
     fracDiffs = absDiffs/(median(absDiffs)+1);
     for i=1:m
@@ -408,7 +535,7 @@ end
 
 return
 end
-%--------------------------------------------------------------------------
+%==========================================================================
 % March 21, 2022
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
