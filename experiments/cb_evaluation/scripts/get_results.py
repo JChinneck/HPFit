@@ -6,13 +6,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn import metrics
 loc="/home/jpbrooks/HPFit/experiments/cb_evaluation/results"
 
-folnames = ["bm-like", "bm-nox", "clustered_outliers", "olive", "rvd-like", "unclustered_outliers", "bm", "rvd", "clustered_outliers_small", "bm_small"]
-reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small"]
+folnames = ["bm-like", "bm-nox", "clustered_outliers", "olive", "rvd-like", "unclustered_outliers", "bm", "rvd", "clustered_outliers_small", "bm_small", "bm-like-large-nA", "bm-like-large-nB"]
+reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small", "bm-like-large-nA", "bm-like-large-nB"]
 gen_names = ["clustered_outliers", "unclustered_outliers", "clustered_outliers_small"]
-
-folnames = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small", "clustered_outliers"]
-reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small"]
-gen_names = ["clustered_outliers"]
 
 experiments=["evaluation"]
 for experiment in experiments:
@@ -78,8 +74,8 @@ for experiment in experiments:
 
         hbreg_fail = []
         for dataset in results.keys():
-            if ("lm runtime" in results[dataset]) and ("cb runtime" not in results[dataset]):
-                hbreg_fail.append(dataset)
+            if "cb runtime" not in results[dataset]:
+               hbreg_fail.append(dataset)
     
         fail_file = open(folname+"hbreg_fail.in", "w")
         for dataset in hbreg_fail:
