@@ -4,9 +4,9 @@
 # name for the job on qstat
 #$ -N evaluation
 # tell SGE that it's an array and job numbers
-#$ -t 1-103:1
+#$ -t 1-69:1
 # tell SGE to run at most 3 jobs at once
-#$ -tc 3
+#$ -tc 6
 
 FOLNAME=clustered_outliers # folder where data is
 EXP=cb_evaluation # experiment
@@ -31,13 +31,19 @@ SEED=$(sed -n -e "$ID p" $SEEDFILE)
 echo "library(MASS)" > $RESLOC/hyper.$ID.in
 echo "library(matlabr)" >> $RESLOC/hyper.$ID.in
 echo "library(robust)" >> $RESLOC/hyper.$ID.in
-echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
 echo "options(matlab.path='/usr/local/MATLAB/R2018b/bin')" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/mpack.txt\")" >> $RESLOC/hyper.$ID.in
 echo "source(\"$SRCLOC/run_competitors.R\")" >> $RESLOC/hyper.$ID.in
-#echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
-echo "no_hbreg(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
-echo "run_alg3(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"$RESLOC\", \"$MOSEKLOC\", \"PCA\")" >> $RESLOC/hyper.$ID.in
+echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
+echo "get_mh(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\")" >> $RESLOC/hyper.$ID.in
+echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
+echo "get_mm(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\")" >> $RESLOC/hyper.$ID.in
+echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
+echo "get_rewlse(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\")" >> $RESLOC/hyper.$ID.in
+echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
+echo "get_dists(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
+echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
+echo "hbreg_only(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, $TIMELIMIT, \"$RESLOC\", \"$MOSEKLOC\")" >> $RESLOC/hyper.$ID.in
 
 /usr/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
 
