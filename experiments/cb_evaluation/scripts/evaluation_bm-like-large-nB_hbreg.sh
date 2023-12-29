@@ -10,7 +10,7 @@
 # hard wall clock time of 1 hour
 #$ -l h_rt=1:00:00
 
-FOLNAME=bm-like-large-nA # folder where data is
+FOLNAME=bm-like-large-nB # folder where data is
 EXP=cb_evaluation # experiment
 JOBNAME=evaluation # name of job on SGE
 TIMELIMIT=60 # used for CB-MIO3
