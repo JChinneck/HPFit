@@ -58,7 +58,7 @@
 %        calculated by fitting the PCA to only the mgood points and then
 %        calculating the TSEstar for those points. 
 
-function [inc] = CBgen2023(Aorig,inParam)
+function [inc] = CBgen(Aorig,inParam)
 inc.status = 0;
 
 fprintf("Input parameters:\n");
