@@ -65,7 +65,7 @@
 %      .MSETru[x]: mean squared residual for the mgood points
 %      .MAETru[x]: mean absolute residual for the mgood points
 
-function [inc] = CBreg2023(y,Aorig,inParam)
+function [inc] = CBreg(y,Aorig,inParam)
 inc.status = 0;
 
 if isfield(inParam,'mgood') == 1
