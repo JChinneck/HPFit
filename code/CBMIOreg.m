@@ -70,7 +70,7 @@
 %   CBreg calls external solver MOSEK under certain conditions
 %      (free academic license).
 
-function [result,output] = CBMIOregV2(y,Ain,mioparams,gbparams)
+function [result,output] = CBMIOreg(y,Ain,mioparams,gbparams)
 
 mtru = mioparams.mtru;
 
