@@ -69,10 +69,8 @@
 % DEPENDENCIES: this routine calls:
 %   External solver Gurobi (free academic license).
 %   CBgen (available on this Github site).
-%   CBgen calls external solver MOSEK under certain conditions
-%      (free academic license).
 
-function [result,output] = CBMIOgenV2(Ain,mioparams,gbparams)
+function [result,output] = CBMIOgen(Ain,mioparams,gbparams)
 
 mtru = mioparams.mtru;
 
