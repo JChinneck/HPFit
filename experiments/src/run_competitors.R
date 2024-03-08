@@ -983,7 +983,7 @@ get_cb_alg3 <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, m
 
 }
 
-get_alg3 <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mosekloc) {
+get_alg3 <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mosekloc, gurobiloc) {
   #loc <- 'vary_everything'
   #fname <- 'm102n47m_outliers5num_clust1same_sideFALSEoutlier_dist1000i848.csv'
   #fname <- "m650n10m_outliers350i0.csv"
@@ -1003,7 +1003,7 @@ get_alg3 <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mose
   X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
 
   q <- floor(q*nrow(X))
-  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
+  add_path <- paste("addpath('", srcloc, "','", mosekloc, "','", gurobiloc,"');", sep="") # add the path to the MATLAB files and MOSEK
   print(paste("addpath('", srcloc, "');", sep=""))
 
   # run CB and alg3
