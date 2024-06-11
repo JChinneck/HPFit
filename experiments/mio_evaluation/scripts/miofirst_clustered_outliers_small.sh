@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name cosiofirst
-#SBATCH --cpus-per-task=1
-#SBATCH --mem 4G
+#SBATCH --cpus-per-task=14
+#SBATCH --mem 16G
 #SBATCH --partition cpu-small
 #SBATCH --array=1-100
 
@@ -38,7 +38,7 @@ echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio1-first\"
 echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
 echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"mio-bm-first\", $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\", \"$GUROBILOC\")" >> $RESLOC/hyper.$ID.in
 
-/opt/R-4.3.1/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/$ID.Rout
+/opt/R-4.3.1/bin/R CMD BATCH $RESLOC/hyper.$ID.in $RESLOC/log/f$ID.Rout
 
 rm $RESLOC/hyper.$ID.in
 #rm $RESLOC/log/$ID.Rout

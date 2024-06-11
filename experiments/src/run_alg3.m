@@ -89,6 +89,7 @@ function [beta_star] = lad(X, dep_var) % LAD = least aboslute deviations = L1 re
        model.sense = repmat('=', m, 1);
        model.modelsense = 'min';
        params = struct();
+       params.Threads=14;
        %params.OutputFlag = 0;
        result = gurobi(model, params);
        beta_star = result.x(1:(n-1)); % coefficients for variables except for response, which is -1 (we don't store the response coefficient)
@@ -102,6 +103,7 @@ function [beta_star] = lad(X, dep_var) % LAD = least aboslute deviations = L1 re
             model.sense = repmat('=', m, 1);
             model.modelsense = 'min';
             params = struct();
+            params.Threads=14;
             params.OutputFlag = 0;
             result = gurobi(model, params);
             beta_star = [n;result.x(1:n-1)];
@@ -131,6 +133,7 @@ function [beta_star] =solve_lp(X, beta, q, dep_var) % called by Algorithm 1
         model.sense = [repmat('>', 2*m, 1); '>'];
         model.modelsense = 'min';
         params = struct();
+        params.Threads=14;
         params.OutputFlag = 0;
         result = gurobi(model, params);
         beta_star = result.x((m+2):(m+1+n-1)); % beta
@@ -152,6 +155,7 @@ function [beta_star] =solve_lp(X, beta, q, dep_var) % called by Algorithm 1
         model.sense = [repmat('>', 2*m, 1) ; '='; '>'];
         model.modelsense = 'min';
         params = struct();
+        params.Threads=14;
         params.OutputFlag = 0;
         result = gurobi(model, params);
         beta_star = result.x((m+2):(m+1+n));

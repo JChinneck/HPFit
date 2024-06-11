@@ -18,6 +18,7 @@ CBreg.m: Runs CB for a regression hyperplane.
 
 CBgen.m: Runs CB for a general hyperplane.  Calls getPCAHP.m.
 
+getPCAHP.m: Gets the PCA hyperplane or if m>n, solves the elastic LP using Gurobi.
 
 
 

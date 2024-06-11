@@ -1,0 +1,12 @@
+1. Submit batch with <dataset>.sh files.  Use 
+
+sbatch <dataset>.sh
+
+2.  Run get_results.py
+
+python get_results.py
+
+3. Failed runs will be in <dataset>hbreg_fail.in.  Move those .in files to data directory.  Remove the paths from the files, leaving only the filename.
+
+4. Submit batch with <dataset>hbreg_fail.sh scripts.  Comment out through mm, then rewlse, then get_dists.  Run get_results.py each time until all <dataset>hbreg_fail.in files are empty.
+

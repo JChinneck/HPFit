@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name rvdlikefail
-#SBATCH --cpus-per-task=1
-#SBATCH --mem 16G
+#SBATCH --cpus-per-task=14
+#SBATCH --mem 32G
 #SBATCH --partition cpu-small
 ##SBATCH --output $HOME/HPFit/experiments/cb_evaluation/results/evaluation/olive/log/slurm-%A_%a.out
-#SBATCH --array=1-17
+#SBATCH --array=1-1
 
 module load matlab/R2023b
 module load R/4.3.1
@@ -29,7 +29,15 @@ mkdir -p $RESLOC/log # make folder for logs
 
 ID=$SLURM_ARRAY_TASK_ID
 
+echo $SLURM_NODEID
+echo $SLURM_JOB_NODELIST
+echo $SLURM_NODELIST
+echo $SLURM_SUBMIT_HOST
+echo $SLURM_NODENAME
+
+
 SEED=$(sed -n -e "$ID p" $SEEDFILE)
+echo $SEED
 echo "library(MASS)" > $RESLOC/hyper.$ID.in
 echo "library(matlabr)" >> $RESLOC/hyper.$ID.in
 echo "options(matlab.path='/opt/matlab2023b/bin')" >> $RESLOC/hyper.$ID.in
@@ -46,8 +54,8 @@ echo "source(\"$SRCLOC/run_mio.R\")" >> $RESLOC/hyper.$ID.in
 #echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"lqs-mio1\",    $TIMELIMIT, \"$RESLOC\", TRUE,  \"$MOSEKLOC\", \"$GUROBILOC\")" >> $RESLOC/hyper.$ID.in
 #echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
 #echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"lqs-mio-bm\",  $TIMELIMIT, \"$RESLOC\", TRUE,  \"$MOSEKLOC\", \"$GUROBILOC\")" >> $RESLOC/hyper.$ID.in
-echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
-echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"cbq-mio1\",    $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\", \"$GUROBILOC\")" >> $RESLOC/hyper.$ID.in
+#echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
+#echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"cbq-mio1\",    $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\", \"$GUROBILOC\")" >> $RESLOC/hyper.$ID.in
 echo "set.seed(12345)" >> $RESLOC/hyper.$ID.in
 echo "run_mio(\"$DATALOC\", \"$SRCLOC\", \"$SEED\", $Q, $DEP_VAR, \"cbq-mio-bm\",  $TIMELIMIT, \"$RESLOC\", FALSE, \"$MOSEKLOC\", \"$GUROBILOC\")" >> $RESLOC/hyper.$ID.in
 

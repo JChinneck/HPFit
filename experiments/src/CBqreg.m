@@ -91,7 +91,7 @@ maxResid = inc.maxResid;
 output.maxResid = maxResid;
 fprintf("  CBreg sets maxResid at %f\n",maxResid)
 
-output.CBregTime = toc(tStart);
+output.CBregTime = toc(tStart)
 output.status = "CBreg_succeeds";
 if inc.status == -1
     fprintf("  CBreg failure: aborting solution.\n")
@@ -129,9 +129,12 @@ end
 % Set up the gurobi parameters
 gbparams = struct();
 gbparams.OutputFlag = 0; 
+gbparams.Threads=14;
 gammaBest = Inf;
 
 for itn =1:m
+    fprintf("iteration %d\n", itn);
+    toc(tStart)
     % Initialize the constraint matrix
     % row order: q elastic constraints, q error constraints
     % col order: n w, q eplus, q eminus, 1 emax

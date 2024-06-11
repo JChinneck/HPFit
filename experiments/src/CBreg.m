@@ -121,6 +121,8 @@ w0 = beta(1,1);
 w = beta(2:norig+1,1);
 resid = w0 + Aorig*w - y;
 absresid = abs(resid);
+curr_time = toc;
+fprintf("Initial regression complete, time %f\n", curr_time);
 
 if max(absresid) < 1.0e-6
     % Exact fit, within tolerance
@@ -188,7 +190,12 @@ inc.totSqResidAllOut = inc.totSqResidAll1;
 %--------------------------------------------------------------------------
 % Analyze and remove outliers and place HP2
 
+curr_time = toc;
+fprintf("Starting outfinder %f\n", curr_time);
 [OM] = outFinderReg(Aorig,y,mgood);
+
+curr_time = toc;
+fprintf("outfinder complete %f\n", curr_time);
 
 inc.q = OM.q;
 inc.numZeroMedians = OM.numZeroMedians;
@@ -212,6 +219,8 @@ if mgood > 0
     inc.outTruFrac = OM.outTruFrac;
     inc.outOutFrac = OM.outOutFrac;
 end
+curr_time = toc;
+fprintf("removed outliers %f\n", curr_time);
 
 % Get the regression solution
 A = [ones(icount,1),B];
@@ -220,6 +229,9 @@ w0 = beta(1,1);
 w = beta(2:norig+1,1);
 resid = w0 + Aorig*w - y;
 absresid = abs(resid);
+
+curr_time = toc;
+fprintf("second regression complete %f\n", curr_time);
 
 inc.resid2 = resid;
 if mgood > 0
@@ -297,6 +309,9 @@ y1 = y1(1:icount,1);
 inc.m3 = icount;
 fprintf("Reinstatement phase: %d points.\n",icount)
 
+curr_time = toc;
+fprintf("reinstated outliers %f\n", curr_time);
+
 % Get the regression solution
 A = [ones(icount,1),B];
 beta = regress(y1,A);
@@ -304,6 +319,9 @@ w0 = beta(1,1);
 w = beta(2:norig+1,1);
 resid = w0 + Aorig*w - y;
 absresid = abs(resid);
+
+curr_time = toc;
+fprintf("third regression %f\n", curr_time);
 
 inc.resid3 = resid;
 inc.totSqResidAll3 = norm(absresid(:,1).*absresid(:,1),1);
@@ -393,6 +411,9 @@ for i=1:m
         y1(icount,1) = y(i,1);
     end
 end
+curr_time = toc;
+fprintf("reinstated outliers again %f\n", curr_time);
+
 B = B(1:icount,:);
 y1 = y1(1:icount,1);
 inc.m4 = icount;
@@ -405,6 +426,9 @@ w0 = beta(1,1);
 w = beta(2:norig+1,1);
 resid = w0 + Aorig*w - y;
 absresid = abs(resid);
+
+curr_time = toc;
+fprintf("regression again %f\n", curr_time);
 
 inc.resid4 = resid;
 inc.totSqResidAll4 = norm(absresid(:,1).*absresid(:,1),1);
@@ -467,6 +491,8 @@ end
 
 %--------------------------------------------------------------------------
 % Collate the final output
+curr_time = toc;
+fprintf("calculating final output %f\n", curr_time);
 
 inc.solTime = toc;
 fprintf("Output solution from Step %d\n",outStep)

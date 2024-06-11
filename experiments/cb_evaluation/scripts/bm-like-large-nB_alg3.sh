@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name alg3bmlikelargenB
-#SBATCH --cpus-per-task=1
-#SBATCH --mem 4G
+#SBATCH --cpus-per-task=14
+#SBATCH --mem 16G
 #SBATCH --partition cpu-small
 #SBATCH -t 0-1:00 # time limit of one hour
 ##SBATCH --output $HOME/HPFit/experiments/cb_evaluation/results/evaluation/olive/log/slurm-%A_%a.out

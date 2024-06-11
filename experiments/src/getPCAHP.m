@@ -25,6 +25,7 @@ if size(dataSet,1) < n
     % Set Gurobi parameters
     gbparams = struct();
     gbparams.OutputFlag = 0;
+    gbparams.Threads=14;
     % Build the complete model constraint matrix and solve.
     model.A = sparse([dataSet,speye(m,m),-speye(m,m)]);
     model.rhs = zeros(m,1) + n;

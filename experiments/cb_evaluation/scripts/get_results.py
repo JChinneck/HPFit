@@ -4,10 +4,10 @@ import scipy.stats
 import glob
 from sklearn.linear_model import LinearRegression
 from sklearn import metrics
-loc="/home/jpbrooks/HPFit/experiments/cb_evaluation/results"
+loc="/lustre/home/jpbrooks/HPFit/experiments/cb_evaluation/results"
 
-folnames = ["bm-like", "bm-nox", "clustered_outliers", "olive", "rvd-like", "unclustered_outliers", "bm", "rvd", "clustered_outliers_small", "bm_small", "bm-like-large-nA", "bm-like-large-nB"]
-reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm_small", "bm-like-large-nA", "bm-like-large-nB"]
+folnames = ["bm-like", "bm-nox", "clustered_outliers", "olive", "rvd-like", "unclustered_outliers", "bm", "rvd", "clustered_outliers_small", "bm-like-large-nA", "bm-like-large-nB"]
+reg_names = ["bm-like", "bm-nox", "olive", "rvd-like", "bm", "rvd", "bm-like-large-nA", "bm-like-large-nB"]
 gen_names = ["clustered_outliers", "unclustered_outliers", "clustered_outliers_small"]
 
 experiments=["evaluation"]
@@ -34,11 +34,11 @@ for experiment in experiments:
                     results[dataset][formulation + " runtime"]=float(line1[9])
                     results[dataset][formulation + " tsestar"]=float(line1[10])
                 elif formulation in ["arob", "bb", "hbreg", "lm", "pca", "lts", "lqs", "mh", "mm", "rewlse"]:
-                    print(line1)
                     results[dataset][formulation + " runtime"]=float(line1[11])
                     results[dataset][formulation + " gamma"]=float(line1[8])
                     results[dataset][formulation + " tsestar"]=float(line1[12])
                 if formulation=="cb":
+                    print(line1)
                     results[dataset]["i"]=int(line1[1])
                     results[dataset]["m"]=int(line1[2])
                     results[dataset]["n"]=int(line1[3])

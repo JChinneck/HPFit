@@ -62,7 +62,7 @@ else
     cbq_beta = [-output.RHS; output.weights];
     cbq_beta = (cbq_beta/cbq_beta(1,1))*n
 end
-cbq_time = toc(tStart);
+cbq_time = toc(tStart)
 
 
 [beta_star, f_beta_star] =mio(iteration, datafname,q, cbq_beta, m_normal, dep_var, formulation, resloc, timelimit-cbq_time);

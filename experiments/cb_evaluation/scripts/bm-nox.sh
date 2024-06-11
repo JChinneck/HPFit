@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name bmnox
-#SBATCH --cpus-per-task=1
-#SBATCH --mem 4G
+#SBATCH --cpus-per-task=14
+#SBATCH --mem 16G
 #SBATCH --partition cpu-small
 ##SBATCH --output $HOME/HPFit/experiments/cb_evaluation/results/evaluation/olive/log/slurm-%A_%a.out
 #SBATCH --array=1-10

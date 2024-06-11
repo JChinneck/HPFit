@@ -146,20 +146,6 @@
 #        - rewlse_intercept: intercept for fitted hyperplane
 #        - rewlse_rq: the q^th squared residual, measured orthogonally
 #        - rewlse_lts: the sum of squares of the m smallest residuals, measured orthogonally
-# - run_alg3: fit a model using Algorithm 3 from Bertsimas and 
-#             Mazumder (2014).
-#     - inputs:
-#        - dataloc: folder containing the data file
-#        - srcloc: folder containing implementation of Algorithm 3
-#        - fname: data file name
-#        - q: percentile for least quantile of squares regression 
-#        - dep_var: whether there is a dependent variable or not
-#        - resloc: folder for results
-#        - mosekloc: location of MOSEK binary 
-#        - init_method: method for initializing Algorithm 3 when no
-#          response variable is specified.  Options are "PCA" for 
-#          principal component analysis and "LP" for elastic LP
-#     - outputs: see run_alg3.m
 # - get_dists: run lm, hbreg, arob, bb, lts, lqs, CB, 
 #              and algorithm 3 on a dataset
 # 
@@ -497,27 +483,6 @@ fit_rewlse <- function(j, X, m, n, q) { # for REWLSE regression - lmRob
 }
 
 
-run_alg3 <- function(dataloc, srcloc, fname, q, dep_var, resloc, mosekloc, init_method) {
-  my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname)
-  my_regmatch <- regmatches(fname, my_regexec)
-  m <- as.numeric(my_regmatch[[1]][2])
-  n <- as.numeric(my_regmatch[[1]][3])
-  i <- as.numeric(my_regmatch[[1]][4])
-  cat("\n", i, "\n")
-  X <- read.csv(paste(dataloc,"/",fname,sep=""), header=FALSE)
-
-  q <- floor(q*nrow(X))
-  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="")
-
-  if (dep_var == TRUE) {
-    dep_var_matlab <- "true" 
-  } else{
-    dep_var_matlab <- "false"
-  }
-
-  print(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m,",",dep_var_matlab,",'", resloc, "','",init_method,"')", sep=""))
-  run_matlab_code(paste(add_path, " ", "run_alg3(", i, ",'",dataloc, "/", fname,"',",q,",", m,",",dep_var_matlab,",'", resloc, "','",init_method,"')", sep=""))
-}
 
 ## -----------------------------------------------------------------------------------------------------
 get_dists <- function(dataloc, srcloc, fname, q, dep_var, timelimit, resloc, mosekloc) {
