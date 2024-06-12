@@ -60,6 +60,7 @@
 # - timelimit: timelimit for the MIP solver
 # - resloc: folder for the output 
 # - mosekloc: location of MOSEK files ($HOME/src/mosek/9.3/toolbox/r2015a)
+# - gurobiloc: location of Gurobi Matlab setup file ($HOME/opt/gurobi1100/linux64/matlab)
 
 
 # function for calculating the squared distance of a point to a
@@ -101,7 +102,7 @@ fit_lqs <- function(j, X, m, n, q) {
 }
 
   
-run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, resloc, calc_lqs_beta, mosekloc) {
+run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, resloc, calc_lqs_beta, mosekloc, gurobiloc) {
   my_regexec <- regexec("m([0-9]+)n([0-9]+).+i([0-9]+).+csv", fname) # get m, n, i from the dataset name
   my_regmatch <- regmatches(fname, my_regexec)
   m <- as.numeric(my_regmatch[[1]][2])
@@ -150,7 +151,7 @@ run_mio <- function(dataloc, srcloc, fname, q, dep_var, formulation, timelimit, 
   }
   make_lqs_beta <- rmat_to_matlab_mat(lqs_beta, matname="lqs_beta") # create the warm start from LQS
   #add_path <- paste("addpath('", srcloc, "');", sep="") 
-  add_path <- paste("addpath('", srcloc, "','", mosekloc, "');", sep="") # add the path to the MATLAB files and MOSEK
+  add_path <- paste("addpath('", srcloc, "','", mosekloc, "','", gurobiloc,"');", sep="") # add the path to the MATLAB files and MOSEK
   if (formulation == "alg3-mio-bm" | formulation == "alg3-mio1" | formulation == "lqs-mio-bm" | formulation == "lqs-mio1" | formulation == "mio-bm" | formulation == "mio1" | formulation == "mio1-first" | formulation == "mio-bm-first") { # use the lqs solution from above or mio.m will call algorithm3.  The time used for lqs is subtracted from the time limit specified.
     if (dep_var == TRUE) { # first variable is response 
       print(paste(add_path, " ", make_lqs_beta, " ", "mio(", i, ",'",dataloc, "/", fname,"',",q,",lqs_beta,", m, ",true,'", formulation, "','", resloc, "',", timelimit-lqs_time[3], ")", sep="")) 

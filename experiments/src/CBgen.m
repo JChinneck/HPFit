@@ -58,7 +58,7 @@
 %        calculated by fitting the PCA to only the mgood points and then
 %        calculating the TSEstar for those points. 
 
-function [inc] = CBgen2023(Aorig,inParam)
+function [inc] = CBgen(Aorig,inParam)
 inc.status = 0;
 
 fprintf("Input parameters:\n");
@@ -536,7 +536,7 @@ end
 return
 end
 %==========================================================================
-% March 21, 2022
+% February 27, 2024
 % John W. Chinneck, Systems and Computer Engineering, 
 %   Carleton University, Ottawa, Canada
 % J. Paul Brooks, Dept. of Information Systems, 
@@ -544,7 +544,7 @@ end
 %
 % Get the best-fitting hyperplane from an input dataset, using PCA.
 % If there are insufficient points, default to an elastic linear
-% programming solution, which uses the MOSEK LP solver.
+% programming solution, which uses the Gurobi LP solver.
 %
 % INPUTS: dataSet is the data matrix
 % OUTPUTS: Hyperplane equation is: w*x = RHS.
@@ -559,26 +559,29 @@ n = size(dataSet,2);
 if size(dataSet,1) < n
     fprintf("  Too few observations vs. features for PCA: running elastic LP.\n")
     m = size(dataSet,1);
-    % Set MOSEK parameters
-    param.MSK_IPAR_LOG = 0;
-    param.MSK_IPAR_OPF_WRITE_HEADER = 'MSK_OFF';
-    param.MSK_IPAR_WRITE_SOL_HEAD = 'MSK_OFF';
+    % Set Gurobi parameters
+    gbparams = struct();
+    gbparams.OutputFlag = 0;
+    gbparams.Threads = 14;
     % Build the complete model constraint matrix and solve.
-    Alp = sparse([dataSet,speye(m,m),-speye(m,m)]);
-    blc = zeros(m,1) + n;
-    buc = zeros(m,1) + n;
-    nfinal = size(Alp,2);
-    blx = zeros(nfinal,1);
-    bux = zeros(nfinal,1) + Inf;
-    blx(1:n,1) = -Inf;
-    % set up original objective function
-    c = ones(nfinal,1);
-    c(1:n,1) = 0.0;
-    c(n+1:n+m,1) = ones(m,1);
-    c(n+m+1:n+2*m,1) = ones(m,1);
+    model.A = sparse([dataSet,speye(m,m),-speye(m,m)]);
+    model.rhs = zeros(m,1) + n;
+    model.sense(1:m,1) = repmat('=',m,1);
+    nfinal = n + 2*m;
+    % variable lower bounds
+    model.lb = zeros(nfinal,1);
+    model.lb(1:n,1) = -Inf;
+    % variable upper bounds
+    model.ub = zeros(nfinal,1) + Inf;
+    % specify variable types
+    model.vtype = repmat('C',nfinal,1);
+    % set up objective function
+    model.obj = ones(nfinal,1);
+    model.obj(1:n,1) = 0.0;
+    model.modelsense = 'min';
     % Solve LP to find hyperplane
-    [res] = msklpopt(c,Alp,blc,buc,blx,bux,param,'minimize echo(0)');
-    w = res.sol.bas.xx(1:n,1);
+    result = gurobi(model, gbparams);
+    w = result.x(1:n,1);
     RHS = n;
     return
 end

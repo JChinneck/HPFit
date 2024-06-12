@@ -131,6 +131,7 @@ end
 % Set up the gurobi parameters
 gbparams = struct();
 gbparams.OutputFlag = 0;
+gbparams.Threads=14;
 
 gammaBest = Inf;
 for itn = 1:m

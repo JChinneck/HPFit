@@ -16,9 +16,9 @@
 % Main versions and options:
 % formulation:
 %   - mio-bm: the original MIP formulation presented in (2.11) of 
-%             Bertsimas and Mazumder (2014).  Warm start with alg3.
+%             Bertsimas and Mazumder (2014).  
 %   - mio1: an equivalent but more compact formualtion developed by
-%           JC.  Warm start with alg3.
+%           JC.  
 %   - lqs-mio-bm: mio-bm warmstarted with LQS.  LQS is run in R.
 %   - lqs-mio1: mio1 warmstarted with LQS.  LQS is run in R.
 %   - alg3-mio-bm: mio-bm warmstarted with Algorithm 3 from Bertsimas
@@ -47,29 +47,49 @@
 % - when a dependent variable is specified, the corresponding 
 %   coefficient is set to -1.  When one is not specified, the 
 %   intercept is set to n.
-% - a result datafile is created containing the data file with full 
-%   path, iteration number, number of rows, number of variables, 
-%   number of non-outliers, q, formulation, total squared error, 
-%   MIP runtime, MIP status, gamma, best MIP bound, number of outliers
-%   identified as one of the q smallest by best MIP feasible solution,
-%   trimmed squared error (TSE) for the q smallest residuals, TSE for 
-%   m_normal residuals after 1 hour, time limit used for the solver,
-%   gamma obtained by using the beta from the warm start, TSE for 
-%   m_normal residuals for warm start, gamma obtained after 60s of MIO
-%   TSE for m_normal after 60s of MIO, gamma obtained after 3600s, TSE
-%   for m_normal after 3600s.
+% - a result datafile is created containing the data file with 
+%     - full path, 
+%     - iteration number, 
+%     - number of rows, 
+%     - number of variables, 
+%     - number of non-outliers, 
+%     - q, 
+%     - formulation, 
+%     - total squared error, 
+%     - MIP runtime (3600s + timelimit - 60s), 
+%     - MIP status, 
+%     - gamma, 
+%     - best MIP bound, 
+%     - number of outliers identified as one of the q smallest by 
+%       best MIP feasible solution,
+%     - trimmed squared error (TSE) for the q smallest residuals, TSE
+%       for m_normal residuals after 1 hour, 
+%     - time used by the warm start heuristic,
+%     - gamma obtained by using the beta from the warm start, 
+%     - TSE for m_normal residuals for warm start, 
+%     - gamma obtained after 60s of MIO
+%     - TSE for m_normal residuals after 60s of MIO, gamma obtained 
+%       after 3600s, 
+%     - TSE for m_normal after 3600s.
+% - the time limit used for the solver is initially 60s minus the time 
+%   to generate a warm start.  If the time is longer than 60s, then it
+%   is negative.  The time limit is then set to 
+%   3600s + timelimit - 60.0 so that the warmstart plus MIO has 3600s
+%   total.  
 % 
 % INPUTS:
 % - options mentioned above
 % - iteration: iteration number.  Used in the output filename.
 % - datafname: full path to data file.
-% - lqs_beta: an initial solution generated using LQS as implemented
-%             in R or CBq. 
+% - lqs_beta: an initial solution generated using LQS or CBq as implemented
+%             in R or CBq.  Only used for lqs-mio-bm, lqs-mio1, cbq-mio1,
+%             cbq-mio-bm.
 % - m_normal: number of non-outlier rows of data.  After that they are
 %             outliers.
 % - resloc: path to folder where output file will reside.
-% - timelimit: time limit for MIP solver.  If alg3 is used as a warm 
-%              start, then that time is subtracted.  
+% - timelimit: time recorded by R for LQS or CBq as a triplet if they are 
+%              used for a warmstart.  If not, provide c(0,0,0).  The time
+%              is subtracted from the time allowed for the MIO.
 %
 % OUTPUTS:
 % - beta_star: the coefficients of the best-fit hyperplane.  When 
@@ -212,7 +232,7 @@ if strcmp(formulation, "alg3-mio-bm") | strcmp(formulation, "lqs-mio-bm") | strc
         tsestarHeur = sum(sorteddist(1:m_normal)) % TSEstar is based on m_normal, which we usually don't know
         tse = sum(sorteddist(1:q)) % TSE is based on q, which we usually set to 0.5
     else % get orthogonal error
-        gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
+        gradLen = norm(beta_start(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
         edist = abs(dist/gradLen);
         sortededist = sort(edist(:,1).*edist(:,1));
         tsestarHeur = sum(sortededist(1:m_normal)) % TSEstar is based on m_normal, which we usually don't know
@@ -250,7 +270,7 @@ elseif strcmp(formulation, "alg3-mio1") | strcmp(formulation, "lqs-mio1") | strc
         tsestarHeur = sum(sorteddist(1:m_normal)) % TSE* is for m_normal, which we usually don't know
         tse = sum(sorteddist(1:q)) % TSE is for q, which is usually 0.5
     else % get orthogonal error
-        gradLen = norm(beta_star(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
+        gradLen = norm(beta_start(2:n,1)); % first coefficient is the intercept; exclude that from the gradLen calculation
         edist = abs(dist/gradLen);
         sortededist = sort(edist(:,1).*edist(:,1));
         tsestarHeur = sum(sortededist(1:m_normal)) % TSE* is for m_normal, which we usually don't know
@@ -271,7 +291,7 @@ end
 if timelimit >= 0.0 % if the warm start took less than 60 seconds, then run MIO for the remaining time.
     params.TimeLimit = timelimit;
     params.Symmetry = 2;
-    params.Threads = 1
+    params.Threads = 14 
     
     disp("solving 60 s")
     result = gurobi(model, params);
